@@ -1,9 +1,13 @@
+<?php
+$base = "http://localhost/kollegieapp-webadmin/";
+?>
 <!DOCTYPE html>
 <html lang="da">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kollegie App Admin Dashboard</title>
+    <link rel="shortcut icon" href="<?= $base ?>assets/logo.png" type="image/x-icon">
+    <title>Kollegie Admin</title>
     <!-- Poppins font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
