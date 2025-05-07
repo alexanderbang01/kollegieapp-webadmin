@@ -1,4 +1,4 @@
-<?php 
+<?php
 $page = 'dashboard';
 include 'components/header.php'; ?>
 
@@ -19,7 +19,7 @@ include 'components/header.php'; ?>
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-4 sm:mb-8">
                     <!-- Total Beboere Card -->
                     <div class="bg-white rounded-xl p-4 sm:p-6 shadow animate-fade-in delay-100 flex items-center">
-                        <div class="rounded-full p-2 sm:p-3 bg-primary/10 text-primary mr-3 sm:mr-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 text-primary mr-3 sm:mr-4 flex items-center justify-center">
                             <i class="fas fa-users text-lg sm:text-xl"></i>
                         </div>
                         <div>
@@ -30,7 +30,7 @@ include 'components/header.php'; ?>
 
                     <!-- Aktive Begivenheder Card -->
                     <div class="bg-white rounded-xl p-4 sm:p-6 shadow animate-fade-in delay-200 flex items-center">
-                        <div class="rounded-full p-2 sm:p-3 bg-secondary/10 text-secondary mr-3 sm:mr-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-secondary/10 text-secondary mr-3 sm:mr-4 flex items-center justify-center">
                             <i class="fas fa-calendar-alt text-lg sm:text-xl"></i>
                         </div>
                         <div>
@@ -41,7 +41,7 @@ include 'components/header.php'; ?>
 
                     <!-- Madplan Status Card -->
                     <div class="bg-white rounded-xl p-4 sm:p-6 shadow animate-fade-in delay-300 flex items-center">
-                        <div class="rounded-full p-2 sm:p-3 bg-accent/10 text-accent mr-3 sm:mr-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-accent/10 text-accent mr-3 sm:mr-4 flex items-center justify-center">
                             <i class="fas fa-utensils text-lg sm:text-xl"></i>
                         </div>
                         <div>
@@ -54,7 +54,7 @@ include 'components/header.php'; ?>
 
                     <!-- Aktive Anmodninger Card -->
                     <div class="bg-white rounded-xl p-4 sm:p-6 shadow animate-fade-in delay-400 flex items-center">
-                        <div class="rounded-full p-2 sm:p-3 bg-danger/10 text-danger mr-3 sm:mr-4">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-danger/10 text-danger mr-3 sm:mr-4 flex items-center justify-center">
                             <i class="fas fa-clipboard-list text-lg sm:text-xl"></i>
                         </div>
                         <div>
@@ -64,59 +64,103 @@ include 'components/header.php'; ?>
                     </div>
                 </div>
 
-                <!-- Recent Activity and Quick Actions -->
+                <!-- Madplan og Hurtige Handlinger -->
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
-                    <!-- Recent Activity -->
+                    <!-- Ugens Madplan (i række-format) -->
                     <div class="lg:col-span-2">
                         <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-100">
                             <div class="flex justify-between items-center mb-4 sm:mb-6">
-                                <h2 class="text-lg sm:text-xl font-bold">Seneste Aktiviteter</h2>
-                                <a href="#" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
+                                <h2 class="text-lg sm:text-xl font-bold">Ugens Madplan</h2>
+                                <a href="<?= $base ?>foodplan/" class="text-primary hover:underline text-xs sm:text-sm">Redigér</a>
                             </div>
-                            <div class="space-y-3 sm:space-y-4">
-                                <div class="flex items-start gap-2 sm:gap-4">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-primary/10 text-primary">
-                                        <i class="fas fa-calendar-plus text-sm sm:text-base"></i>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium text-sm sm:text-base">Ny begivenhed oprettet</p>
-                                        <p class="text-gray-600 text-xs sm:text-sm">Filmaften er planlagt til fredag d. 15. maj</p>
-                                        <p class="text-gray-400 text-xs mt-1">For 2 timer siden</p>
-                                    </div>
-                                </div>
-                                <div class="border-t border-gray-200 my-2"></div>
-                                <div class="flex items-start gap-2 sm:gap-4">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-secondary/10 text-secondary">
-                                        <i class="fas fa-utensils text-sm sm:text-base"></i>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium text-sm sm:text-base">Madplan opdateret</p>
-                                        <p class="text-gray-600 text-xs sm:text-sm">Madplanen for uge 20 er blevet opdateret</p>
-                                        <p class="text-gray-400 text-xs mt-1">For 5 timer siden</p>
-                                    </div>
-                                </div>
-                                <div class="border-t border-gray-200 my-2"></div>
-                                <div class="flex items-start gap-2 sm:gap-4">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-accent/10 text-accent">
-                                        <i class="fas fa-user-plus text-sm sm:text-base"></i>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium text-sm sm:text-base">Ny beboer tilføjet</p>
-                                        <p class="text-gray-600 text-xs sm:text-sm">Mikkel Hansen er flyttet ind på værelse B12</p>
-                                        <p class="text-gray-400 text-xs mt-1">For 1 dag siden</p>
-                                    </div>
-                                </div>
-                                <div class="border-t border-gray-200 my-2"></div>
-                                <div class="flex items-start gap-2 sm:gap-4">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-danger/10 text-danger">
-                                        <i class="fas fa-exclamation-circle text-sm sm:text-base"></i>
-                                    </div>
-                                    <div>
-                                        <p class="font-medium text-sm sm:text-base">Vedligeholdelsesanmodning</p>
-                                        <p class="text-gray-600 text-xs sm:text-sm">Vandhane i køkken 3 drypper og skal repareres</p>
-                                        <p class="text-gray-400 text-xs mt-1">For 1 dag siden</p>
-                                    </div>
-                                </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full min-w-full">
+                                    <thead>
+                                        <tr class="text-left">
+                                            <th class="pb-2 text-sm font-medium text-gray-500">Dag</th>
+                                            <th class="pb-2 text-sm font-medium text-gray-500">Ret</th>
+                                            <th class="pb-2 text-sm font-medium text-gray-500">Tidspunkt</th>
+                                            <th class="pb-2 text-sm font-medium text-gray-500">Allergener</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <!-- Mandag -->
+                                        <tr class="border-t border-gray-100">
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium text-gray-800">Mandag</p>
+                                                <p class="text-xs text-gray-500">1. maj</p>
+                                            </td>
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium">Lasagne med salat</p>
+                                                <p class="text-xs text-gray-500">Hjemmelavet lasagne med oksekød og grøn salat</p>
+                                            </td>
+                                            <td class="py-3 pr-2 text-primary">18:00</td>
+                                            <td class="py-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Tirsdag -->
+                                        <tr class="border-t border-gray-100">
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium text-gray-800">Tirsdag</p>
+                                                <p class="text-xs text-gray-500">2. maj</p>
+                                            </td>
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium">Kylling i karry</p>
+                                                <p class="text-xs text-gray-500">Kylling i karrysauce med ris og nanbrød</p>
+                                            </td>
+                                            <td class="py-3 pr-2 text-primary">18:00</td>
+                                            <td class="py-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Onsdag (aktiv dag) -->
+                                        <tr class="border-t border-gray-100 bg-primary/5">
+                                            <td class="py-3 pr-2 border-l-4 border-primary pl-2">
+                                                <p class="font-medium text-gray-800">Onsdag</p>
+                                                <p class="text-xs text-gray-500">3. maj</p>
+                                            </td>
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium">Pasta Carbonara</p>
+                                                <p class="text-xs text-gray-500">Klassisk italiensk ret med bacon, æg og parmesan</p>
+                                            </td>
+                                            <td class="py-3 pr-2 text-primary">18:00</td>
+                                            <td class="py-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Æg</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        <!-- Torsdag -->
+                                        <tr class="border-t border-gray-100">
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium text-gray-800">Torsdag</p>
+                                                <p class="text-xs text-gray-500">4. maj</p>
+                                            </td>
+                                            <td class="py-3 pr-2">
+                                                <p class="font-medium">Taco torsdag</p>
+                                                <p class="text-xs text-gray-500">Tacos med oksekød, salsa, guacamole og tilbehør</p>
+                                            </td>
+                                            <td class="py-3 pr-2 text-primary">18:00</td>
+                                            <td class="py-3">
+                                                <div class="flex flex-wrap gap-1">
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
+                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -126,20 +170,20 @@ include 'components/header.php'; ?>
                         <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-200">
                             <h2 class="text-lg sm:text-xl font-bold mb-4 sm:mb-6">Hurtige Handlinger</h2>
                             <div class="space-y-2 sm:space-y-3">
-                                <a href="<?=$base?>foodplan/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-primary/10 text-primary">
+                                <a href="<?= $base ?>foodplan/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                                         <i class="fas fa-utensils text-sm sm:text-base"></i>
                                     </div>
                                     <span class="font-medium text-sm sm:text-base">Opdater madplan</span>
                                 </a>
-                                <a href="<?=$base?>events/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-primary/10 text-primary">
+                                <a href="<?= $base ?>events/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                                         <i class="fas fa-calendar-plus text-sm sm:text-base"></i>
                                     </div>
                                     <span class="font-medium text-sm sm:text-base">Opret begivenhed</span>
                                 </a>
-                                <a href="<?=$base?>news/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
-                                    <div class="rounded-full p-1.5 sm:p-2 bg-primary/10 text-primary">
+                                <a href="<?= $base ?>news/" class="flex items-center gap-2 sm:gap-4 p-2 sm:p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors">
+                                    <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                                         <i class="fas fa-newspaper text-sm sm:text-base"></i>
                                     </div>
                                     <span class="font-medium text-sm sm:text-base">Tilføj nyhed</span>
@@ -149,34 +193,13 @@ include 'components/header.php'; ?>
                     </div>
                 </div>
 
-                <!-- Madplan og Kommende Begivenheder -->
+                <!-- Kommende Begivenheder og Seneste Aktiviteter Byttet -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 mt-4 sm:mt-8">
-                    <!-- Dagens Madplan -->
+                    <!-- Kommende Begivenheder -->
                     <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-100">
                         <div class="flex justify-between items-center mb-4 sm:mb-6">
-                            <h2 class="text-lg sm:text-xl font-bold">Dagens Madplan</h2>
-                            <a href="<?=$base?>foodplan/" class="text-primary hover:underline text-xs sm:text-sm">Redigér</a>
-                        </div>
-                        <div class="bg-primary/5 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
-                            <div class="flex justify-between mb-2">
-                                <span class="font-medium text-sm sm:text-base">Onsdag, 3. maj</span>
-                                <span class="text-primary font-medium text-sm sm:text-base">18:00</span>
-                            </div>
-                            <h3 class="text-base sm:text-lg font-bold mb-1">Pasta Carbonara</h3>
-                            <p class="text-gray-600 text-xs sm:text-sm">Klassisk italiensk ret med bacon, æg og parmesan.</p>
-                            <div class="mt-2 sm:mt-3 flex flex-wrap gap-1 sm:gap-2">
-                                <span class="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
-                                <span class="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
-                                <span class="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-200 text-gray-700 text-xs rounded-full">Æg</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Kommende Begivenheder -->
-                    <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-200">
-                        <div class="flex justify-between items-center mb-4 sm:mb-6">
                             <h2 class="text-lg sm:text-xl font-bold">Kommende Begivenheder</h2>
-                            <a href="<?=$base?>events/" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
+                            <a href="<?= $base ?>events/" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
                         </div>
                         <div class="space-y-3 sm:space-y-4">
                             <div class="border-l-4 border-primary pl-2 sm:pl-4">
@@ -202,6 +225,48 @@ include 'components/header.php'; ?>
                                 </div>
                                 <h3 class="font-bold text-sm sm:text-base">Generalforsamling</h3>
                                 <p class="text-gray-600 text-xs">Fællesrummet • 32 tilmeldte</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Seneste Aktiviteter -->
+                    <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-200">
+                        <div class="flex justify-between items-center mb-4 sm:mb-6">
+                            <h2 class="text-lg sm:text-xl font-bold">Seneste Aktiviteter</h2>
+                            <a href="#" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
+                        </div>
+                        <div class="space-y-3 sm:space-y-4">
+                            <div class="flex items-start gap-2 sm:gap-4">
+                                <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                                    <i class="fas fa-calendar-plus text-sm sm:text-base"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm sm:text-base">Ny begivenhed oprettet</p>
+                                    <p class="text-gray-600 text-xs sm:text-sm">Filmaften er planlagt til fredag d. 15. maj</p>
+                                    <p class="text-gray-400 text-xs mt-1">For 2 timer siden</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-200 my-2"></div>
+                            <div class="flex items-start gap-2 sm:gap-4">
+                                <div class="w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center">
+                                    <i class="fas fa-utensils text-sm sm:text-base"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm sm:text-base">Madplan opdateret</p>
+                                    <p class="text-gray-600 text-xs sm:text-sm">Madplanen for uge 20 er blevet opdateret</p>
+                                    <p class="text-gray-400 text-xs mt-1">For 5 timer siden</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-gray-200 my-2"></div>
+                            <div class="flex items-start gap-2 sm:gap-4">
+                                <div class="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center">
+                                    <i class="fas fa-user-plus text-sm sm:text-base"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm sm:text-base">Ny beboer tilføjet</p>
+                                    <p class="text-gray-600 text-xs sm:text-sm">Mikkel Hansen er flyttet ind på værelse B12</p>
+                                    <p class="text-gray-400 text-xs mt-1">For 1 dag siden</p>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -16,10 +16,6 @@ include '../components/header.php';
                         <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Beboere</h1>
                         <p class="text-sm sm:text-base text-gray-600">Administrer kollegiets beboere</p>
                     </div>
-                    <button class="bg-primary hover:bg-primary/90 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base transition-colors flex items-center gap-2">
-                        <i class="fas fa-plus"></i>
-                        <span>Tilføj beboer</span>
-                    </button>
                 </div>
 
                 <!-- Search and filter -->
@@ -33,12 +29,6 @@ include '../components/header.php';
                                 <option value="2nd">2. etage</option>
                                 <option value="3rd">3. etage</option>
                                 <option value="4th">4. etage</option>
-                            </select>
-                            <select class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                <option value="all">Alle statusser</option>
-                                <option value="active">Aktive</option>
-                                <option value="new">Nye beboere</option>
-                                <option value="leaving">Fraflyttende</option>
                             </select>
                         </div>
 
@@ -80,9 +70,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse B12 • Stuen</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -95,8 +82,8 @@ include '../components/header.php';
                                     <p class="text-sm">+45 12 34 56 78</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">1. april 2025</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">B12 - Stuen</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500">Uddannelse</p>
@@ -136,9 +123,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse A05 • 1. etage</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -151,8 +135,8 @@ include '../components/header.php';
                                     <p class="text-sm">+45 23 45 67 89</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">15. februar 2024</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">A05 - 1. etage</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500">Uddannelse</p>
@@ -192,9 +176,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse C21 • 2. etage</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Ny beboer</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -207,8 +188,8 @@ include '../components/header.php';
                                     <p class="text-sm">+45 34 56 78 90</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">1. maj 2025</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">C21 - 2. etage</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500">Uddannelse</p>
@@ -248,9 +229,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse D34 • 3. etage</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Fraflytter</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -263,12 +241,12 @@ include '../components/header.php';
                                     <p class="text-sm">+45 45 67 89 01</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">1. september 2023</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">D34 - 3. etage</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Fraflytningsdato</p>
-                                    <p class="text-sm">31. maj 2025</p>
+                                    <p class="text-xs text-gray-500">Uddannelse</p>
+                                    <p class="text-sm">N/A</p>
                                 </div>
                             </div>
                             <div class="flex justify-between mt-2">
@@ -304,9 +282,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse B08 • Stuen</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -319,8 +294,8 @@ include '../components/header.php';
                                     <p class="text-sm">+45 56 78 90 12</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">15. januar 2025</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">B08 - Stuen</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500">Uddannelse</p>
@@ -360,9 +335,6 @@ include '../components/header.php';
                                     <p class="text-sm text-gray-500">Værelse A12 • 1. etage</p>
                                 </div>
                             </div>
-                            <div class="flex">
-                                <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                            </div>
                         </div>
                         <div class="p-4">
                             <div class="grid grid-cols-2 gap-3 mb-4">
@@ -375,8 +347,8 @@ include '../components/header.php';
                                     <p class="text-sm">+45 67 89 01 23</p>
                                 </div>
                                 <div>
-                                    <p class="text-xs text-gray-500">Indflytningsdato</p>
-                                    <p class="text-sm">1. august 2024</p>
+                                    <p class="text-xs text-gray-500">Værelse</p>
+                                    <p class="text-sm">A12 - 1. etage</p>
                                 </div>
                                 <div>
                                     <p class="text-xs text-gray-500">Uddannelse</p>
@@ -414,8 +386,7 @@ include '../components/header.php';
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Værelse</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Telefon</th>
-                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Indflytning</th>
-                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Status</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Uddannelse</th>
                                 <th class="px-4 py-3 text-center text-sm font-medium text-gray-500">Handlinger</th>
                             </tr>
                         </thead>
@@ -429,13 +400,10 @@ include '../components/header.php';
                                         <span class="font-medium">Mikkel Hansen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">B12, Stuen</td>
+                                <td class="px-4 py-3 text-sm">B12 - Stuen</td>
                                 <td class="px-4 py-3 text-sm">mikkel.hansen@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 12 34 56 78</td>
-                                <td class="px-4 py-3 text-sm">1. april 2025</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">Datamatiker</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
@@ -462,13 +430,10 @@ include '../components/header.php';
                                         <span class="font-medium">Laura Jensen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">A05, 1. etage</td>
+                                <td class="px-4 py-3 text-sm">A05 - 1. etage</td>
                                 <td class="px-4 py-3 text-sm">laura.jensen@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 23 45 67 89</td>
-                                <td class="px-4 py-3 text-sm">15. februar 2024</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">Sygeplejerske</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
@@ -495,13 +460,10 @@ include '../components/header.php';
                                         <span class="font-medium">Anders Petersen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">C21, 2. etage</td>
+                                <td class="px-4 py-3 text-sm">C21 - 2. etage</td>
                                 <td class="px-4 py-3 text-sm">anders.p@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 34 56 78 90</td>
-                                <td class="px-4 py-3 text-sm">1. maj 2025</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Ny beboer</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">Multimediedesigner</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
@@ -528,13 +490,10 @@ include '../components/header.php';
                                         <span class="font-medium">Sofia Nielsen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">D34, 3. etage</td>
+                                <td class="px-4 py-3 text-sm">D34 - 3. etage</td>
                                 <td class="px-4 py-3 text-sm">sofia.nielsen@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 45 67 89 01</td>
-                                <td class="px-4 py-3 text-sm">1. september 2023</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">Fraflytter</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">N/A</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
@@ -561,13 +520,10 @@ include '../components/header.php';
                                         <span class="font-medium">Mathias Andersen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">B08, Stuen</td>
+                                <td class="px-4 py-3 text-sm">B08 - Stuen</td>
                                 <td class="px-4 py-3 text-sm">mathias.a@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 56 78 90 12</td>
-                                <td class="px-4 py-3 text-sm">15. januar 2025</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">Serviceøkonom</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
@@ -594,13 +550,10 @@ include '../components/header.php';
                                         <span class="font-medium">Emma Hansen</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-sm">A12, 1. etage</td>
+                                <td class="px-4 py-3 text-sm">A12 - 1. etage</td>
                                 <td class="px-4 py-3 text-sm">emma.h@example.com</td>
                                 <td class="px-4 py-3 text-sm">+45 67 89 01 23</td>
-                                <td class="px-4 py-3 text-sm">1. august 2024</td>
-                                <td class="px-4 py-3">
-                                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Aktiv</span>
-                                </td>
+                                <td class="px-4 py-3 text-sm">Markedsføringsøkonom</td>
                                 <td class="px-4 py-3">
                                     <div class="flex justify-center gap-2">
                                         <button class="text-gray-500 hover:text-primary transition-colors p-1">
