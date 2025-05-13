@@ -1,6 +1,19 @@
 <?php
 $page = 'dashboard';
-include 'components/header.php'; ?>
+
+// Start session
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Tjek om bruger er logget ind, ellers redirect til login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login/");
+    exit();
+}
+
+include 'components/header.php'; 
+?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
     <div class="flex flex-grow">
@@ -12,7 +25,7 @@ include 'components/header.php'; ?>
             <div class="p-3 sm:p-6">
                 <div class="mb-4 sm:mb-6">
                     <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
-                    <p class="text-sm sm:text-base text-gray-600">Velkommen tilbage, Admin Jensen</p>
+                    <p class="text-sm sm:text-base text-gray-600">Velkommen tilbage, <?php echo isset($_SESSION['name']) ? htmlspecialchars($_SESSION['name']) : 'Administrator'; ?></p>
                 </div>
 
                 <!-- Overview Cards - Optimeret til mobile enheder -->

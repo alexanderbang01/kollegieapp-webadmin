@@ -1,6 +1,85 @@
 <?php
 $page = "residents";
+
+// Start session
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Tjek om bruger er logget ind, ellers redirect til login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login/");
+    exit();
+}
 include '../components/header.php';
+include '../database/db_conn.php';
+
+// Hent beboere fra databasen
+$residents = [];
+$total_residents = 0;
+
+if (isset($conn)) {
+    // Håndter søgning
+    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+    // Håndter paginering
+    $page_number = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $items_per_page = 6;
+    $offset = ($page_number - 1) * $items_per_page;
+
+    // Opbyg forespørgsel
+    $query_params = [];
+    $where_clauses = [];
+
+    if ($search_query) {
+        $where_clauses[] = "(first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR room_number LIKE ?)";
+        $search_param = "%{$search_query}%";
+        $query_params[] = $search_param;
+        $query_params[] = $search_param;
+        $query_params[] = $search_param;
+        $query_params[] = $search_param;
+    }
+
+    $where_sql = !empty($where_clauses) ? "WHERE " . implode(" AND ", $where_clauses) : "";
+
+    // Tæl total antal beboere med de valgte filtre
+    $count_sql = "SELECT COUNT(*) as total FROM residents $where_sql";
+
+    if (!empty($query_params)) {
+        $count_stmt = $conn->prepare($count_sql);
+        $count_stmt->bind_param(str_repeat('s', count($query_params)), ...$query_params);
+        $count_stmt->execute();
+        $count_result = $count_stmt->get_result();
+    } else {
+        $count_result = $conn->query($count_sql);
+    }
+
+    $total_residents = $count_result->fetch_assoc()['total'];
+    $total_pages = ceil($total_residents / $items_per_page);
+
+    // Hent beboere med paginering
+    $sql = "SELECT * FROM residents $where_sql ORDER BY room_number ASC LIMIT ?, ?";
+
+    $stmt = $conn->prepare($sql);
+
+    if (!empty($query_params)) {
+        // Tilføj paginering-parametre
+        $query_params[] = $offset;
+        $query_params[] = $items_per_page;
+
+        $param_types = str_repeat('s', count($query_params) - 2) . 'ii';
+        $stmt->bind_param($param_types, ...$query_params);
+    } else {
+        $stmt->bind_param("ii", $offset, $items_per_page);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    while ($row = $result->fetch_assoc()) {
+        $residents[] = $row;
+    }
+}
 ?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
@@ -11,370 +90,157 @@ include '../components/header.php';
         <main class="flex-grow">
             <!-- Residents content -->
             <div class="p-3 sm:p-6">
-                <div class="mb-4 sm:mb-6 flex justify-between items-center">
-                    <div>
-                        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Beboere</h1>
-                        <p class="text-sm sm:text-base text-gray-600">Administrer kollegiets beboere</p>
-                    </div>
+                <div class="mb-4 sm:mb-6">
+                    <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Beboere</h1>
+                    <p class="text-sm sm:text-base text-gray-600">Administrer kollegiets beboere</p>
                 </div>
 
                 <!-- Search and filter -->
                 <div class="bg-white rounded-xl shadow p-4 sm:p-6 mb-4 sm:mb-6 animate-fade-in">
-                    <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div class="flex items-center gap-4">
-                            <select class="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                <option value="all">Alle etager</option>
-                                <option value="ground">Stuen</option>
-                                <option value="1st">1. etage</option>
-                                <option value="2nd">2. etage</option>
-                                <option value="3rd">3. etage</option>
-                                <option value="4th">4. etage</option>
-                            </select>
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <!-- Search field -->
+                        <div class="relative sm:w-1/2 w-full">
+                            <input type="text" id="live-search" placeholder="Søg efter beboer..." class="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50" value="<?php echo isset($_GET['search']) ? htmlspecialchars($_GET['search']) : ''; ?>">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         </div>
 
-                        <div class="flex gap-3 w-full sm:w-auto">
-                            <div class="relative flex-grow sm:w-64">
-                                <input type="text" placeholder="Søg efter beboer..." class="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <!-- Layout controls -->
+                        <div class="sm:w-1/2 flex items-center justify-end gap-4">
+                            <div class="flex">
+                                <button type="button" id="view-grid" class="w-10 h-10 flex items-center justify-center rounded bg-primary text-white" title="Grid visning">
+                                    <i class="fas fa-th-large"></i>
+                                </button>
+                                <button type="button" id="view-list" class="w-10 h-10 flex items-center justify-center rounded hover:bg-gray-100" title="Listevisning">
+                                    <i class="fas fa-list"></i>
+                                </button>
                             </div>
-                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 p-2 rounded-lg transition-colors">
-                                <i class="fas fa-filter"></i>
-                            </button>
                         </div>
                     </div>
                 </div>
 
-                <!-- View toggle -->
-                <div class="mb-4 flex justify-end">
-                    <div class="bg-white rounded-lg shadow p-2 flex gap-2">
-                        <button id="view-grid" class="w-8 h-8 flex items-center justify-center rounded bg-primary text-white" title="Grid visning">
-                            <i class="fas fa-th"></i>
-                        </button>
-                        <button id="view-list" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100" title="Listevisning">
-                            <i class="fas fa-list"></i>
-                        </button>
+                <!-- Status message -->
+                <?php if (isset($_SESSION['success_message']) || isset($_SESSION['error_message'])): ?>
+                    <?php
+                    $message = '';
+                    $message_type = '';
+
+                    if (isset($_SESSION['success_message'])) {
+                        $message = $_SESSION['success_message'];
+                        $message_type = 'success';
+                        unset($_SESSION['success_message']);
+                    } elseif (isset($_SESSION['error_message'])) {
+                        $message = $_SESSION['error_message'];
+                        $message_type = 'error';
+                        unset($_SESSION['error_message']);
+                    }
+                    ?>
+                    <div id="status-message" class="<?php echo $message_type == 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' : 'bg-red-100 border-l-4 border-red-500 text-red-700'; ?> px-4 py-3 rounded shadow mb-6" role="alert">
+                        <div class="flex">
+                            <div class="py-1 mr-2">
+                                <i class="fas fa-<?php echo $message_type == 'success' ? 'check-circle' : 'exclamation-circle'; ?>"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold"><?php echo $message_type == 'success' ? 'Succes!' : 'Fejl!'; ?></p>
+                                <p><?php echo $message; ?></p>
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    <script>
+                        // Skjul besked efter 3 sekunder
+                        setTimeout(function() {
+                            const statusMessage = document.getElementById('status-message');
+                            if (statusMessage) {
+                                statusMessage.style.opacity = '0';
+                                statusMessage.style.transition = 'opacity 0.5s';
+                                setTimeout(function() {
+                                    statusMessage.style.display = 'none';
+                                }, 500);
+                            }
+                        }, 3000);
+                    </script>
+                <?php endif; ?>
 
                 <!-- Residents Grid View -->
                 <div id="residents-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                    <!-- Resident 1 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-100 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-lg font-medium">
-                                    MH
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Mikkel Hansen</h3>
-                                    <p class="text-sm text-gray-500">Værelse B12 • Stuen</p>
-                                </div>
-                            </div>
+                    <?php if (empty($residents)): ?>
+                        <div class="col-span-3 bg-white rounded-xl shadow p-6 text-center">
+                            <p class="text-gray-500">Ingen beboere fundet.</p>
                         </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">mikkel.hansen@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 12 34 56 78</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">B12 - Stuen</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">Datamatiker</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <?php else: ?>
+                        <?php foreach ($residents as $index => $resident): ?>
+                            <?php
+                            // Generer initialer til beboer-avatar
+                            $initials = strtoupper(substr($resident['first_name'], 0, 1) . substr($resident['last_name'], 0, 1));
 
-                    <!-- Resident 2 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-200 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center text-lg font-medium">
-                                    LJ
+                            // Vælg en farve baseret på beboer-ID (for konsistens)
+                            $colors = ['primary', 'secondary', 'accent'];
+                            $color = $colors[$resident['id'] % count($colors)];
+                            ?>
+                            <!-- Resident Card -->
+                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> overflow-hidden resident-card" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>">
+                                <div class="flex justify-between items-center p-4 border-b border-gray-100">
+                                    <div class="flex items-center gap-3">
+                                        <?php if ($resident['profile_image']): ?>
+                                            <div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
+                                                <img src="<?php echo htmlspecialchars($resident['profile_image']); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover">
+                                            </div>
+                                        <?php else: ?>
+                                            <div class="w-12 h-12 rounded-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-lg font-medium">
+                                                <?php echo $initials; ?>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div>
+                                            <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?></h3>
+                                            <p class="text-sm text-gray-500">Værelse <?php echo htmlspecialchars($resident['room_number']); ?></p>
+                                        </div>
+                                    </div>
+                                    <div class="relative resident-dropdown">
+                                        <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('<?php echo $resident['id']; ?>')">
+                                            <i class="fas fa-ellipsis-v"></i>
+                                        </button>
+                                        <div id="dropdown-<?php echo $resident['id']; ?>" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
+                                            <div class="py-1">
+                                                <a href="edit-resident.php?id=<?php echo $resident['id']; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                                    <i class="fas fa-pencil-alt mr-2"></i> Rediger
+                                                </a>
+                                                <a href="mailto:<?php echo htmlspecialchars($resident['email']); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                                    <i class="fas fa-envelope mr-2"></i> Send besked
+                                                </a>
+                                                <button onclick="event.stopPropagation(); confirmDelete(<?php echo $resident['id']; ?>)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
+                                                    <i class="fas fa-trash mr-2"></i> Slet
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Laura Jensen</h3>
-                                    <p class="text-sm text-gray-500">Værelse A05 • 1. etage</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">laura.jensen@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 23 45 67 89</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">A05 - 1. etage</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">Sygeplejerske</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resident 3 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-300 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-accent text-white flex items-center justify-center text-lg font-medium">
-                                    AP
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Anders Petersen</h3>
-                                    <p class="text-sm text-gray-500">Værelse C21 • 2. etage</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">anders.p@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 34 56 78 90</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">C21 - 2. etage</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">Multimediedesigner</p>
+                                <div class="p-4">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                                        <div>
+                                            <p class="text-xs text-gray-500">Email</p>
+                                            <p class="text-sm truncate"><?php echo htmlspecialchars($resident['email']); ?></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Telefon</p>
+                                            <p class="text-sm"><?php echo htmlspecialchars($resident['phone']); ?></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Værelse</p>
+                                            <p class="text-sm"><?php echo htmlspecialchars($resident['room_number']); ?></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Kontaktperson</p>
+                                            <p class="text-sm truncate"><?php echo htmlspecialchars($resident['contact_name'] ?: 'N/A'); ?></p>
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end mt-2">
+                                        <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+                                            Se oplysninger
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resident 4 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-400 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-lg font-medium">
-                                    SN
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Sofia Nielsen</h3>
-                                    <p class="text-sm text-gray-500">Værelse D34 • 3. etage</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">sofia.nielsen@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 45 67 89 01</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">D34 - 3. etage</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">N/A</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resident 5 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-100 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-secondary text-white flex items-center justify-center text-lg font-medium">
-                                    MA
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Mathias Andersen</h3>
-                                    <p class="text-sm text-gray-500">Værelse B08 • Stuen</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">mathias.a@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 56 78 90 12</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">B08 - Stuen</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">Serviceøkonom</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Resident 6 -->
-                    <div class="bg-white rounded-xl shadow animate-fade-in delay-200 overflow-hidden">
-                        <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                            <div class="flex items-center gap-3">
-                                <div class="w-12 h-12 rounded-full bg-accent text-white flex items-center justify-center text-lg font-medium">
-                                    EH
-                                </div>
-                                <div>
-                                    <h3 class="font-bold text-gray-800">Emma Hansen</h3>
-                                    <p class="text-sm text-gray-500">Værelse A12 • 1. etage</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="p-4">
-                            <div class="grid grid-cols-2 gap-3 mb-4">
-                                <div>
-                                    <p class="text-xs text-gray-500">Email</p>
-                                    <p class="text-sm">emma.h@example.com</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Telefon</p>
-                                    <p class="text-sm">+45 67 89 01 23</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Værelse</p>
-                                    <p class="text-sm">A12 - 1. etage</p>
-                                </div>
-                                <div>
-                                    <p class="text-xs text-gray-500">Uddannelse</p>
-                                    <p class="text-sm">Markedsføringsøkonom</p>
-                                </div>
-                            </div>
-                            <div class="flex justify-between mt-2">
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-envelope"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-phone"></i>
-                                    </button>
-                                </div>
-                                <div class="flex gap-1">
-                                    <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                        <i class="fas fa-pencil-alt"></i>
-                                    </button>
-                                    <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Residents List View (hidden by default) -->
@@ -386,232 +252,228 @@ include '../components/header.php';
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Værelse</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Telefon</th>
-                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Uddannelse</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Kontaktperson</th>
                                 <th class="px-4 py-3 text-center text-sm font-medium text-gray-500">Handlinger</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">
-                                            MH
-                                        </div>
-                                        <span class="font-medium">Mikkel Hansen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">B12 - Stuen</td>
-                                <td class="px-4 py-3 text-sm">mikkel.hansen@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 12 34 56 78</td>
-                                <td class="px-4 py-3 text-sm">Datamatiker</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center text-sm font-medium">
-                                            LJ
-                                        </div>
-                                        <span class="font-medium">Laura Jensen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">A05 - 1. etage</td>
-                                <td class="px-4 py-3 text-sm">laura.jensen@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 23 45 67 89</td>
-                                <td class="px-4 py-3 text-sm">Sygeplejerske</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium">
-                                            AP
-                                        </div>
-                                        <span class="font-medium">Anders Petersen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">C21 - 2. etage</td>
-                                <td class="px-4 py-3 text-sm">anders.p@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 34 56 78 90</td>
-                                <td class="px-4 py-3 text-sm">Multimediedesigner</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-medium">
-                                            SN
-                                        </div>
-                                        <span class="font-medium">Sofia Nielsen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">D34 - 3. etage</td>
-                                <td class="px-4 py-3 text-sm">sofia.nielsen@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 45 67 89 01</td>
-                                <td class="px-4 py-3 text-sm">N/A</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="border-b hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-secondary text-white flex items-center justify-center text-sm font-medium">
-                                            MA
-                                        </div>
-                                        <span class="font-medium">Mathias Andersen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">B08 - Stuen</td>
-                                <td class="px-4 py-3 text-sm">mathias.a@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 56 78 90 12</td>
-                                <td class="px-4 py-3 text-sm">Serviceøkonom</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-sm font-medium">
-                                            EH
-                                        </div>
-                                        <span class="font-medium">Emma Hansen</span>
-                                    </div>
-                                </td>
-                                <td class="px-4 py-3 text-sm">A12 - 1. etage</td>
-                                <td class="px-4 py-3 text-sm">emma.h@example.com</td>
-                                <td class="px-4 py-3 text-sm">+45 67 89 01 23</td>
-                                <td class="px-4 py-3 text-sm">Markedsføringsøkonom</td>
-                                <td class="px-4 py-3">
-                                    <div class="flex justify-center gap-2">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-envelope"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-phone"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1">
-                                            <i class="fas fa-pencil-alt"></i>
-                                        </button>
-                                        <button class="text-gray-500 hover:text-danger transition-colors p-1">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
+                            <?php if (empty($residents)): ?>
+                                <tr>
+                                    <td colspan="6" class="px-4 py-3 text-center text-gray-500">Ingen beboere fundet.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($residents as $resident): ?>
+                                    <?php
+                                    // Generer initialer til beboer-avatar
+                                    $initials = strtoupper(substr($resident['first_name'], 0, 1) . substr($resident['last_name'], 0, 1));
+
+                                    // Vælg en farve baseret på beboer-ID (for konsistens)
+                                    $colors = ['primary', 'secondary', 'accent'];
+                                    $color = $colors[$resident['id'] % count($colors)];
+                                    ?>
+                                    <tr class="border-b hover:bg-gray-50 resident-card" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>">
+                                        <td class="px-4 py-3">
+                                            <div class="flex items-center gap-2">
+                                                <?php if ($resident['profile_image']): ?>
+                                                    <div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
+                                                        <img src="<?php echo htmlspecialchars($resident['profile_image']); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover">
+                                                    </div>
+                                                <?php else: ?>
+                                                    <div class="w-8 h-8 rounded-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-sm font-medium">
+                                                        <?php echo $initials; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                                <span class="font-medium"><?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?></span>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['room_number']); ?></td>
+                                        <td class="px-4 py-3 text-sm truncate max-w-[200px]"><?php echo htmlspecialchars($resident['email']); ?></td>
+                                        <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['phone']); ?></td>
+                                        <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['contact_name'] ?: 'N/A'); ?></td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex justify-center gap-2">
+                                                <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <div class="relative resident-dropdown">
+                                                    <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('<?php echo $resident['id']; ?>-list')">
+                                                        <i class="fas fa-ellipsis-v"></i>
+                                                    </button>
+                                                    <div id="dropdown-<?php echo $resident['id']; ?>-list" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
+                                                        <div class="py-1">
+                                                            <a href="edit-resident.php?id=<?php echo $resident['id']; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                                                <i class="fas fa-pencil-alt mr-2"></i> Rediger
+                                                            </a>
+                                                            <a href="mailto:<?php echo htmlspecialchars($resident['email']); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                                                <i class="fas fa-envelope mr-2"></i> Send besked
+                                                            </a>
+                                                            <button onclick="event.stopPropagation(); confirmDelete(<?php echo $resident['id']; ?>)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
+                                                                <i class="fas fa-trash mr-2"></i> Slet
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Pagination -->
-                <div class="flex justify-between items-center">
-                    <div class="text-gray-500 text-sm">
-                        Viser 1-6 af 112 beboere
+                <div id="pagination-container">
+                    <?php if ($total_pages > 1): ?>
+                        <div class="flex justify-between items-center">
+                            <div class="text-gray-500 text-sm">
+                                Viser <?php echo $offset + 1; ?>-<?php echo min($offset + count($residents), $total_residents); ?> af <?php echo $total_residents; ?> beboere
+                            </div>
+                            <div class="flex gap-1">
+                                <a href="?page=<?php echo max(1, $page_number - 1); ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number > 1 ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+
+                                <?php
+                                // Vis begrænset antal sider, hvis der er mange
+                                $max_visible_pages = 5;
+                                $start_page = max(1, min($page_number - floor($max_visible_pages / 2), $total_pages - $max_visible_pages + 1));
+                                $end_page = min($start_page + $max_visible_pages - 1, $total_pages);
+
+                                if ($start_page > 1):
+                                ?>
+                                    <a href="?page=1&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
+                                        1
+                                    </a>
+                                    <?php if ($start_page > 2): ?>
+                                        <span class="w-8 h-8 flex items-center justify-center text-gray-500">...</span>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+
+                                <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                    <a href="?page=<?php echo $i; ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $i == $page_number ? 'bg-primary text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors'; ?>">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endfor; ?>
+
+                                <?php if ($end_page < $total_pages): ?>
+                                    <?php if ($end_page < $total_pages - 1): ?>
+                                        <span class="w-8 h-8 flex items-center justify-center text-gray-500">...</span>
+                                    <?php endif; ?>
+                                    <a href="?page=<?php echo $total_pages; ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
+                                        <?php echo $total_pages; ?>
+                                    </a>
+                                <?php endif; ?>
+
+                                <a href="?page=<?php echo min($total_pages, $page_number + 1); ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number < $total_pages ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Search Results (hidden by default) -->
+                <div id="search-results" class="hidden">
+                    <!-- List view search results -->
+                    <div id="results-list-view" class="hidden bg-white rounded-xl shadow overflow-hidden mb-6">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="bg-gray-50 border-b">
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Navn</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Værelse</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Email</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Telefon</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500">Kontaktperson</th>
+                                    <th class="px-4 py-3 text-center text-sm font-medium text-gray-500"><i class="fas fa-eye"></i></th>
+                                </tr>
+                            </thead>
+                            <tbody id="results-table-body">
+                                <!-- Search results will be loaded here -->
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="flex gap-1">
-                        <button class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 text-gray-400 cursor-not-allowed">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <button class="w-8 h-8 rounded flex items-center justify-center bg-primary text-white">
-                            1
-                        </button>
-                        <button class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                            2
-                        </button>
-                        <button class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                            3
-                        </button>
-                        <button class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
+
+                    <!-- Grid view search results -->
+                    <div id="results-grid-view" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <!-- Search results will be loaded here -->
+                    </div>
+
+                    <!-- Message when no search results -->
+                    <div id="no-results" class="hidden bg-white rounded-xl shadow p-6 text-center">
+                        <p class="text-gray-500">Ingen beboere matcher din søgning.</p>
                     </div>
                 </div>
             </div>
         </main>
     </div>
 
+    <!-- Resident Details Modal -->
+    <div id="resident-details-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto scale-95 transition-transform duration-300">
+            <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary/10 text-primary p-2 rounded-lg">
+                        <i class="fas fa-user text-lg"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-800 text-xl" id="modal-title">Beboerdetaljer</h3>
+                </div>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6" id="modal-content">
+                <!-- Resident details will be loaded here -->
+                <div class="flex justify-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-md scale-95 transition-transform duration-300 p-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-4">Bekræft sletning</h3>
+            <p class="text-gray-600 mb-6">Er du sikker på, at du vil slette denne beboer? Denne handling kan ikke fortrydes.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-delete" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
+                    Annuller
+                </button>
+                <form id="delete-form" action="delete-resident.php" method="POST">
+                    <input type="hidden" id="delete-resident-id" name="resident_id" value="">
+                    <button type="submit" class="bg-danger hover:bg-danger/90 text-white px-4 py-2 rounded-lg transition-colors">
+                        Slet beboer
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
     <script>
         // View toggle functionality
         const viewGridBtn = document.getElementById('view-grid');
         const viewListBtn = document.getElementById('view-list');
         const residentsGrid = document.getElementById('residents-grid');
         const residentsList = document.getElementById('residents-list');
+        const searchResults = document.getElementById('search-results');
+        const resultsGridView = document.getElementById('results-grid-view');
+        const resultsListView = document.getElementById('results-list-view');
+        const paginationContainer = document.getElementById('pagination-container');
+        const noResultsMessage = document.getElementById('no-results');
+
+        // Global variabel til at holde styr på visningstype (grid eller list)
+        let currentView = 'grid';
 
         viewGridBtn.addEventListener('click', () => {
-            residentsGrid.classList.remove('hidden');
-            residentsList.classList.add('hidden');
+            currentView = 'grid';
+
+            if (isSearchActive()) {
+                resultsGridView.classList.remove('hidden');
+                resultsListView.classList.add('hidden');
+            } else {
+                residentsGrid.classList.remove('hidden');
+                residentsList.classList.add('hidden');
+            }
 
             viewGridBtn.classList.add('bg-primary', 'text-white');
             viewGridBtn.classList.remove('hover:bg-gray-100');
@@ -621,14 +483,497 @@ include '../components/header.php';
         });
 
         viewListBtn.addEventListener('click', () => {
-            residentsGrid.classList.add('hidden');
-            residentsList.classList.remove('hidden');
+            currentView = 'list';
+
+            if (isSearchActive()) {
+                resultsGridView.classList.add('hidden');
+                resultsListView.classList.remove('hidden');
+            } else {
+                residentsGrid.classList.add('hidden');
+                residentsList.classList.remove('hidden');
+            }
 
             viewListBtn.classList.add('bg-primary', 'text-white');
             viewListBtn.classList.remove('hover:bg-gray-100');
 
             viewGridBtn.classList.remove('bg-primary', 'text-white');
             viewGridBtn.classList.add('hover:bg-gray-100');
+        });
+
+        // Dropdown menu functionality
+        function toggleDropdown(residentId) {
+            const targetDropdown = document.getElementById(`dropdown-${residentId}`);
+            if (!targetDropdown) return;
+
+            // Luk alle andre dropdowns
+            document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+                if (dropdown.id !== `dropdown-${residentId}`) {
+                    dropdown.classList.add('hidden');
+                }
+            });
+
+            // Toggle den valgte dropdown
+            targetDropdown.classList.toggle('hidden');
+
+            // Forhindre andre event handlers i at blive udløst
+            event.stopPropagation();
+        }
+
+        // Skjul dropdowns når der klikkes udenfor
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.dropdown-toggle') && !e.target.closest('.dropdown-menu')) {
+                document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
+                    dropdown.classList.add('hidden');
+                });
+            }
+        });
+
+        // Live søgning
+        const liveSearch = document.getElementById('live-search');
+        const resultsTableBody = document.getElementById('results-table-body');
+
+        function isSearchActive() {
+            return !searchResults.classList.contains('hidden');
+        }
+
+        // Søgefunktion
+        function performSearch() {
+            const query = liveSearch.value.trim().toLowerCase();
+
+            if (query === '') {
+                // Ingen søgning, vis standardindhold
+                searchResults.classList.add('hidden');
+                paginationContainer.classList.remove('hidden');
+
+                if (currentView === 'grid') {
+                    residentsGrid.classList.remove('hidden');
+                    residentsList.classList.add('hidden');
+                } else {
+                    residentsGrid.classList.add('hidden');
+                    residentsList.classList.remove('hidden');
+                }
+                return;
+            }
+
+            // Aktiver søgeresultater
+            searchResults.classList.remove('hidden');
+            paginationContainer.classList.add('hidden');
+            residentsGrid.classList.add('hidden');
+            residentsList.classList.add('hidden');
+
+            // Ryd tidligere resultater
+            resultsGridView.innerHTML = '';
+            resultsTableBody.innerHTML = '';
+
+            // Hent alle beboere
+            const allResidentCards = document.querySelectorAll('.resident-card');
+
+            // Hold styr på hvilke beboer-IDs der allerede er tilføjet
+            const addedResidentIds = new Set();
+
+            // Filtrer beboere
+            let matchFound = false;
+
+            allResidentCards.forEach(card => {
+                const cardId = card.getAttribute('data-id');
+
+                // Spring over hvis denne beboer allerede er tilføjet
+                if (addedResidentIds.has(cardId)) return;
+
+                const name = card.getAttribute('data-name').toLowerCase();
+                const room = card.getAttribute('data-room').toLowerCase();
+                const email = card.getAttribute('data-email').toLowerCase();
+                const phone = card.getAttribute('data-phone').toLowerCase();
+
+                // Tjek om beboeren matcher søgningen
+                const matchesSearch = query === '' ||
+                    name.includes(query) ||
+                    room.includes(query) ||
+                    email.includes(query) ||
+                    phone.includes(query);
+
+                if (matchesSearch) {
+                    matchFound = true;
+                    // Tilføj ID til set'et for at undgå dubletter
+                    addedResidentIds.add(cardId);
+
+                    // Tilføj til grid visning
+                    const gridItem = createSearchResultGridItem(cardId, name, room, email, phone);
+                    resultsGridView.appendChild(gridItem);
+
+                    // Tilføj til liste visning
+                    const listItem = createSearchResultListItem(cardId, name, room, email, phone);
+                    resultsTableBody.appendChild(listItem);
+                }
+            });
+
+            // Vis "Ingen resultater" hvis ingen resultater blev fundet
+            if (!matchFound) {
+                noResultsMessage.classList.remove('hidden');
+                resultsGridView.classList.add('hidden');
+                resultsListView.classList.add('hidden');
+            } else {
+                noResultsMessage.classList.add('hidden');
+
+                // Vis den aktive visning
+                if (currentView === 'grid') {
+                    resultsGridView.classList.remove('hidden');
+                    resultsListView.classList.add('hidden');
+                } else {
+                    resultsGridView.classList.add('hidden');
+                    resultsListView.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Opret grid element til søgeresultater
+        function createSearchResultGridItem(id, name, room, email, phone) {
+            // Generer initialer
+            const nameParts = name.split(' ');
+            const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
+
+            // Vælg farve baseret på ID
+            const colors = ['primary', 'secondary', 'accent'];
+            const color = colors[id % colors.length];
+
+            // Opret element
+            const div = document.createElement('div');
+            div.className = 'bg-white rounded-xl shadow overflow-hidden resident-card';
+            div.setAttribute('data-id', id);
+
+            div.innerHTML = `
+               <div class="flex justify-between items-center p-4 border-b border-gray-100">
+                   <div class="flex items-center gap-3">
+                       <div class="w-12 h-12 rounded-full bg-${color} text-white flex items-center justify-center text-lg font-medium">
+                           ${initials}
+                       </div>
+                       <div>
+                           <h3 class="font-bold text-gray-800">${name}</h3>
+                           <p class="text-sm text-gray-500">Værelse ${room}</p>
+                       </div>
+                   </div>
+                   <div class="relative resident-dropdown">
+                       <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('${id}-search')">
+                           <i class="fas fa-ellipsis-v"></i>
+                       </button>
+                       <div id="dropdown-${id}-search" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
+                           <div class="py-1">
+                               <a href="edit-resident.php?id=${id}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                   <i class="fas fa-pencil-alt mr-2"></i> Rediger
+                               </a>
+                               <a href="mailto:${email}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                   <i class="fas fa-envelope mr-2"></i> Send besked
+                               </a>
+                               <button onclick="event.stopPropagation(); confirmDelete(${id})" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
+                                   <i class="fas fa-trash mr-2"></i> Slet
+                               </button>
+                           </div>
+                       </div>
+                   </div>
+               </div>
+               <div class="p-4">
+                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                       <div>
+                           <p class="text-xs text-gray-500">Email</p>
+                           <p class="text-sm truncate">${email}</p>
+                       </div>
+                       <div>
+                           <p class="text-xs text-gray-500">Telefon</p>
+                           <p class="text-sm">${phone}</p>
+                       </div>
+                       <div>
+                           <p class="text-xs text-gray-500">Værelse</p>
+                           <p class="text-sm">${room}</p>
+                       </div>
+                   </div>
+                   <div class="flex justify-end mt-2">
+                       <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="showResidentDetails(${id})">
+                           Se oplysninger
+                       </button>
+                   </div>
+               </div>
+           `;
+
+            return div;
+        }
+
+        // Opret liste element til søgeresultater
+        function createSearchResultListItem(id, name, room, email, phone) {
+            // Generer initialer
+            const nameParts = name.split(' ');
+            const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
+
+            // Vælg farve baseret på ID
+            const colors = ['primary', 'secondary', 'accent'];
+            const color = colors[id % colors.length];
+
+            // Opret element
+            const tr = document.createElement('tr');
+            tr.className = 'border-b hover:bg-gray-50 resident-card';
+            tr.setAttribute('data-id', id);
+
+            tr.innerHTML = `
+               <td class="px-4 py-3">
+                   <div class="flex items-center gap-2">
+                       <div class="w-8 h-8 rounded-full bg-${color} text-white flex items-center justify-center text-sm font-medium">
+                           ${initials}
+                       </div>
+                       <span class="font-medium">${name}</span>
+                   </div>
+               </td>
+               <td class="px-4 py-3 text-sm">${room}</td>
+               <td class="px-4 py-3 text-sm truncate max-w-[200px]">${email}</td>
+               <td class="px-4 py-3 text-sm">${phone}</td>
+               <td class="px-4 py-3">
+                   <div class="flex justify-center gap-2">
+                       <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="showResidentDetails(${id})">
+                           <i class="fas fa-eye"></i>
+                       </button>
+                       <div class="relative resident-dropdown">
+                           <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('${id}-list-search')">
+                               <i class="fas fa-ellipsis-v"></i>
+                           </button>
+                           <div id="dropdown-${id}-list-search" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
+                               <div class="py-1">
+                                   <a href="edit-resident.php?id=${id}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                       <i class="fas fa-pencil-alt mr-2"></i> Rediger
+                                   </a>
+                                   <a href="mailto:${email}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
+                                       <i class="fas fa-envelope mr-2"></i> Send besked
+                                   </a>
+                                   <button onclick="event.stopPropagation(); confirmDelete(${id})" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
+                                       <i class="fas fa-trash mr-2"></i> Slet
+                                   </button>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               </td>
+           `;
+
+            return tr;
+        }
+
+        // Tilføj event listeners til søgning
+        liveSearch.addEventListener('input', performSearch);
+
+        // Resident details modal
+        const modal = document.getElementById('resident-details-modal');
+        const modalContainer = modal.querySelector('.bg-white');
+        const closeModalBtn = document.getElementById('close-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content');
+
+        function showResidentDetails(residentId) {
+            // Vis loading indikator
+            modalContent.innerHTML = `
+        <div class="flex justify-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+    `;
+
+            // Vis modal med animation
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('opacity-100');
+                modalContainer.classList.remove('scale-95');
+                modalContainer.classList.add('scale-100');
+            }, 10);
+            document.body.classList.add('overflow-hidden');
+
+            // Hent beboerdata via AJAX
+            fetch(`get-resident-details.php?id=${residentId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Netværksfejl ved hentning af data');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        const resident = data.resident;
+
+                        // Opdater modal titel
+                        modalTitle.textContent = resident.first_name + ' ' + resident.last_name;
+
+                        // Generer initialer og vælg en farve
+                        const initials = (resident.first_name.charAt(0) + resident.last_name.charAt(0)).toUpperCase();
+                        const colors = ['primary', 'secondary', 'accent'];
+                        const color = colors[resident.id % colors.length];
+
+                        // Opdater modal indhold
+                        modalContent.innerHTML = `
+                    <div class="flex flex-col sm:flex-row gap-6">
+                        <div class="sm:w-1/3 flex flex-col items-center">
+                            ${resident.profile_image 
+                                ? `<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
+                                    <img src="${resident.profile_image}" alt="${resident.first_name} ${resident.last_name}" class="w-full h-full object-cover">
+                                  </div>`
+                                : `<div class="w-32 h-32 rounded-full bg-${color} text-white flex items-center justify-center text-4xl font-medium">
+                                    ${initials}
+                                  </div>`
+                            }
+                            <h3 class="text-xl font-bold mt-4 text-center">${resident.first_name} ${resident.last_name}</h3>
+                            <p class="text-gray-500 text-center">${resident.room_number}</p>
+                        </div>
+                        
+                        <div class="sm:w-2/3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <h4 class="font-semibold text-gray-700 mb-4">Kontaktoplysninger</h4>
+                                    <div class="space-y-2">
+                                        <div>
+                                            <p class="text-xs text-gray-500">Email</p>
+                                            <p>${resident.email}</p>
+                                        </div>
+                                        <div>
+                                            <p class="text-xs text-gray-500">Telefon</p>
+                                            <p>${resident.phone}</p>
+                                        </div>
+                                        <div class="mt-4">
+                                            <p class="text-xs text-gray-500">Værelse</p>
+                                            <p>${resident.room_number}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <h4 class="font-semibold text-gray-700 mb-4">Nødkontakt</h4>
+                                    <div class="space-y-2">
+                                        ${resident.contact_name ? `
+                                        <div>
+                                            <p class="text-xs text-gray-500">Navn</p>
+                                            <p>${resident.contact_name}</p>
+                                        </div>` : ''}
+                                        ${resident.contact_phone ? `
+                                        <div>
+                                            <p class="text-xs text-gray-500">Telefon</p>
+                                            <p>${resident.contact_phone}</p>
+                                        </div>` : ''}
+                                        ${!resident.contact_name && !resident.contact_phone ? `
+                                        <p class="text-gray-500">Ingen kontaktperson angivet</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-4 mt-4 flex justify-end gap-2">
+                        <a href="mailto:${resident.email}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-envelope"></i>
+                            <span>Send email</span>
+                        </a>
+                        <a href="edit-resident.php?id=${resident.id}" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
+                            <i class="fas fa-pencil-alt"></i>
+                            <span>Rediger</span>
+                        </a>
+                    </div>
+                `;
+                    } else {
+                        // Vis fejlbesked
+                        modalContent.innerHTML = `
+                    <div class="bg-red-50 rounded-lg p-4 text-center">
+                        <p class="text-red-500">Der opstod en fejl: ${data.message || 'Kunne ikke hente beboerdata'}</p>
+                    </div>
+                    <div class="flex justify-end mt-4">
+                        <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                            Luk
+                        </button>
+                    </div>
+                `;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching resident:', error);
+                    modalContent.innerHTML = `
+                <div class="bg-red-50 rounded-lg p-4 text-center">
+                    <p class="text-red-500">Der opstod en fejl ved hentning af beboerdata: ${error.message}</p>
+                    <p class="text-sm text-red-400 mt-2">Kontroller, at filen get-resident-details.php eksisterer og fungerer korrekt.</p>
+                </div>
+                <div class="flex justify-end mt-4">
+                    <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                        Luk
+                    </button>
+                </div>
+            `;
+                });
+        }
+
+        function closeModal() {
+            // Skjul modal med animation
+            modal.classList.remove('opacity-100');
+            modalContainer.classList.remove('scale-100');
+            modalContainer.classList.add('scale-95');
+
+            // Vent på at animationen er færdig før vi fjerner modalen helt
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }, 300);
+        }
+
+        closeModalBtn.addEventListener('click', closeModal);
+
+        // Luk modal når der klikkes udenfor
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Luk modal med Escape-tasten
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Delete confirmation
+        const deleteModal = document.getElementById('delete-confirm-modal');
+        const deleteModalContainer = deleteModal.querySelector('.bg-white');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+        const deleteResidentIdField = document.getElementById('delete-resident-id');
+
+        function confirmDelete(residentId) {
+            deleteResidentIdField.value = residentId;
+
+            // Vis modal med animation
+            deleteModal.classList.remove('hidden');
+            setTimeout(() => {
+                deleteModal.classList.add('opacity-100');
+                deleteModalContainer.classList.remove('scale-95');
+                deleteModalContainer.classList.add('scale-100');
+            }, 10);
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeDeleteModal() {
+            // Skjul modal med animation
+            deleteModal.classList.remove('opacity-100');
+            deleteModalContainer.classList.remove('scale-100');
+            deleteModalContainer.classList.add('scale-95');
+
+            // Vent på at animationen er færdig før vi fjerner modalen helt
+            setTimeout(() => {
+                deleteModal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }, 300);
+        }
+
+        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+
+        // Luk delete modal når der klikkes udenfor
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) {
+                closeDeleteModal();
+            }
+        });
+
+        // Luk delete modal med Escape-tasten
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !deleteModal.classList.contains('hidden')) {
+                closeDeleteModal();
+            }
         });
     </script>
 </body>

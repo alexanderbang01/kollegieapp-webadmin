@@ -1,3 +1,15 @@
+<?php
+// Start session
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Tjek om bruger er logget ind, ellers redirect til login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login/");
+    exit();
+}
+?>
 <!-- Sidebar for desktop -->
 <aside class="w-64 bg-white shadow-md hidden md:block h-screen sticky top-0" style="width: 16rem; min-width: 16rem; max-width: 16rem;">
     <div class="flex items-center gap-3 text-primary font-bold text-xl p-6 border-b">
@@ -33,7 +45,6 @@
                 <a href="<?=$base?>events/" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'events' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                     <i class="fas fa-calendar-alt"></i>
                     <span>Begivenheder</span>
-                    <span class="ml-auto bg-primary text-white text-xs px-2 py-1 rounded-full">3</span>
                 </a>
             </li>
             <li>
@@ -57,7 +68,7 @@
         </ul>
     </div>
     <div class="absolute bottom-0 w-full p-6 border-t">
-        <a href="<?=$base?>backend/auth/logout.php" class="flex items-center gap-3 text-gray-700 hover:text-danger transition-colors">
+        <a href="<?=$base?>login/logout.php" class="flex items-center gap-3 text-gray-700 hover:text-danger transition-colors">
             <i class="fas fa-sign-out-alt"></i>
             <span>Log ud</span>
         </a>
@@ -105,7 +116,6 @@
                     <a href="<?=$base?>events/" class="flex items-center gap-3 px-4 py-3 <?php echo $page === 'events' ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Begivenheder</span>
-                        <span class="ml-auto bg-primary text-white text-xs px-2 py-1 rounded-full">3</span>
                     </a>
                 </li>
                 <li>
@@ -129,7 +139,7 @@
             </ul>
         </div>
         <div class="absolute bottom-0 w-full p-6 border-t">
-            <a href="<?=$base?>backend/auth/logout.php" class="flex items-center gap-3 text-gray-700 hover:text-danger transition-colors">
+            <a href="<?=$base?>login/logout.php" class="flex items-center gap-3 text-gray-700 hover:text-danger transition-colors">
                 <i class="fas fa-sign-out-alt"></i>
                 <span>Log ud</span>
             </a>

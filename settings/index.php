@@ -1,6 +1,30 @@
 <?php 
 $page = "settings";
+
+// Start session
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Tjek om bruger er logget ind, ellers redirect til login
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login/");
+    exit();
+}
 include '../components/header.php';
+include '../database/db_conn.php';
+
+// Hent brugerdata fra databasen hvis brugeren er administrator
+$staff_users = [];
+if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
+    $stmt = $conn->prepare("SELECT id, username, name, email, role FROM users ORDER BY role DESC, name ASC");
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    while ($row = $result->fetch_assoc()) {
+        $staff_users[] = $row;
+    }
+}
 ?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
@@ -11,387 +35,370 @@ include '../components/header.php';
         <main class="flex-grow">
             <!-- Settings content -->
             <div class="p-3 sm:p-6">
-                <div class="mb-4 sm:mb-6">
-                    <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Indstillinger</h1>
-                    <p class="text-sm sm:text-base text-gray-600">Administrer systemindstillinger og konfiguration</p>
-                </div>
-
-                <!-- Settings navigation -->
-                <div class="bg-white rounded-xl shadow mb-6">
-                    <div class="border-b border-gray-200">
-                        <nav class="flex overflow-x-auto">
-                            <button class="text-primary border-b-2 border-primary font-medium px-4 py-3 whitespace-nowrap">
-                                Generelt
-                            </button>
-                            <button class="text-gray-500 hover:text-gray-700 px-4 py-3 whitespace-nowrap">
-                                Brugere & Tilladelser
-                            </button>
-                            <button class="text-gray-500 hover:text-gray-700 px-4 py-3 whitespace-nowrap">
-                                Notifikationer
-                            </button>
-                            <button class="text-gray-500 hover:text-gray-700 px-4 py-3 whitespace-nowrap">
-                                Integration
-                            </button>
-                            <button class="text-gray-500 hover:text-gray-700 px-4 py-3 whitespace-nowrap">
-                                Backup & Gendan
-                            </button>
-                            <button class="text-gray-500 hover:text-gray-700 px-4 py-3 whitespace-nowrap">
-                                System
-                            </button>
-                        </nav>
+                <div class="mb-4 sm:mb-6 flex justify-between items-center">
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Indstillinger</h1>
+                        <p class="text-sm sm:text-base text-gray-600">Administrer din konto og brugerindstillinger</p>
                     </div>
                 </div>
 
-                <!-- General Settings Section -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <!-- Left sidebar with categories -->
-                    <div class="bg-white rounded-xl shadow p-4 h-min">
-                        <h2 class="font-bold text-gray-800 mb-3">Kategorier</h2>
-                        <nav class="space-y-1">
-                            <a href="#app-settings" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary font-medium">
-                                <i class="fas fa-cog"></i>
-                                <span>App indstillinger</span>
-                            </a>
-                            <a href="#college-info" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-                                <i class="fas fa-building"></i>
-                                <span>Kollegieoplysninger</span>
-                            </a>
-                            <a href="#appearance" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-                                <i class="fas fa-palette"></i>
-                                <span>Udseende</span>
-                            </a>
-                            <a href="#modules" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-                                <i class="fas fa-puzzle-piece"></i>
-                                <span>Moduler</span>
-                            </a>
-                            <a href="#email-templates" class="flex items-center gap-2 px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors">
-                                <i class="fas fa-envelope-open-text"></i>
-                                <span>Email skabeloner</span>
-                            </a>
-                        </nav>
+                <!-- Status message -->
+                <?php if (isset($_SESSION['success_message']) || isset($_SESSION['error_message'])): ?>
+                    <?php
+                    $message = '';
+                    $message_type = '';
+
+                    if (isset($_SESSION['success_message'])) {
+                        $message = $_SESSION['success_message'];
+                        $message_type = 'success';
+                        unset($_SESSION['success_message']);
+                    } elseif (isset($_SESSION['error_message'])) {
+                        $message = $_SESSION['error_message'];
+                        $message_type = 'error';
+                        unset($_SESSION['error_message']);
+                    }
+                    ?>
+                    <div id="status-message" class="<?php echo $message_type == 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' : 'bg-red-100 border-l-4 border-red-500 text-red-700'; ?> px-4 py-3 rounded shadow mb-6" role="alert">
+                        <div class="flex">
+                            <div class="py-1 mr-2">
+                                <i class="fas fa-<?php echo $message_type == 'success' ? 'check-circle' : 'exclamation-circle'; ?>"></i>
+                            </div>
+                            <div>
+                                <p class="font-bold"><?php echo $message_type == 'success' ? 'Succes!' : 'Fejl!'; ?></p>
+                                <p><?php echo $message; ?></p>
+                            </div>
+                        </div>
                     </div>
+                    <script>
+                        // Skjul besked efter 3 sekunder
+                        setTimeout(function() {
+                            const statusMessage = document.getElementById('status-message');
+                            if (statusMessage) {
+                                statusMessage.style.opacity = '0';
+                                statusMessage.style.transition = 'opacity 0.5s';
+                                setTimeout(function() {
+                                    statusMessage.style.display = 'none';
+                                }, 500);
+                            }
+                        }, 3000);
+                    </script>
+                <?php endif; ?>
 
-                    <!-- Main settings area -->
-                    <div class="md:col-span-2 space-y-6">
-                        <!-- App Settings -->
-                        <section id="app-settings" class="bg-white rounded-xl shadow overflow-hidden">
-                            <div class="border-b border-gray-200 px-4 py-3 flex justify-between items-center">
-                                <h2 class="font-bold text-lg text-gray-800">App indstillinger</h2>
-                                <button class="text-primary hover:text-primary/80 transition-colors">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                            <div class="p-4 sm:p-6 space-y-5">
-                                <!-- App Name -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label for="app-name" class="font-medium">App navn</label>
-                                        <p class="text-sm text-gray-500">Navnet på app'en</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <input type="text" id="app-name" value="Mercantec Kollegium" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
+                <!-- Main settings area med side-by-side layout -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Personlig profil -->
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="border-b border-gray-200 px-4 py-3">
+                            <h2 class="font-bold text-lg text-gray-800">Personlig profil</h2>
+                        </div>
+                        
+                        <div class="p-4 sm:p-6">
+                            <div class="space-y-4">                           
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Bruger ID</label>
+                                    <input type="text" value="<?php echo $_SESSION['user_id']; ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
                                 </div>
-
-                                <!-- Language -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label for="language" class="font-medium">Sprog</label>
-                                        <p class="text-sm text-gray-500">App'ens standardsprog</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <select id="language" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                            <option value="da">Dansk</option>
-                                            <option value="en">Engelsk</option>
-                                            <option value="de">Tysk</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Timezone -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label for="timezone" class="font-medium">Tidszone</label>
-                                        <p class="text-sm text-gray-500">App'ens tidszone</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <select id="timezone" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                            <option value="Europe/Copenhagen">Europa/København (UTC+2)</option>
-                                            <option value="Europe/London">Europa/London (UTC+1)</option>
-                                            <option value="Europe/Berlin">Europa/Berlin (UTC+2)</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Session Timeout -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label for="session-timeout" class="font-medium">Session timeout</label>
-                                        <p class="text-sm text-gray-500">Tid før automatisk log ud</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <select id="session-timeout" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                            <option value="30">30 minutter</option>
-                                            <option value="60">1 time</option>
-                                            <option value="120">2 timer</option>
-                                            <option value="240">4 timer</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <!-- Maintenance Mode -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label class="font-medium">Vedligeholdelsestilstand</label>
-                                        <p class="text-sm text-gray-500">Aktivér ved opdateringer</p>
-                                    </div>
-                                    <div class="md:col-span-2 flex items-center gap-4">
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer">
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                        <span class="text-gray-500 text-sm">Deaktiveret</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-50 px-6 py-4 flex justify-end">
-                                <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                    Gem ændringer
-                                </button>
-                            </div>
-                        </section>
-
-                        <!-- Appearance Settings -->
-                        <section id="appearance" class="bg-white rounded-xl shadow overflow-hidden">
-                            <div class="border-b border-gray-200 px-4 py-3 flex justify-between items-center">
-                                <h2 class="font-bold text-lg text-gray-800">Udseende</h2>
-                                <button class="text-primary hover:text-primary/80 transition-colors">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                            <div class="p-4 sm:p-6 space-y-5">
-                                <!-- Logo Upload -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                                    <div class="md:col-span-1">
-                                        <label class="font-medium">Logo</label>
-                                        <p class="text-sm text-gray-500">Upload app logo</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <div class="flex items-center gap-4">
-                                            <div class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center">
-                                                <img src="<?=$base?>assets/logo.png" alt="App logo" class="max-w-full max-h-full">
-                                            </div>
-                                            <div>
-                                                <label for="logo-upload" class="bg-primary/10 text-primary hover:bg-primary/20 font-medium px-3 py-1.5 rounded cursor-pointer inline-block">
-                                                    <i class="fas fa-upload mr-1"></i> Upload nyt logo
-                                                </label>
-                                                <input id="logo-upload" type="file" class="hidden">
-                                                <p class="text-xs text-gray-500 mt-1">Anbefalet størrelse: 512x512px</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Color Theme -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-                                    <div class="md:col-span-1">
-                                        <label class="font-medium">Farvetema</label>
-                                        <p class="text-sm text-gray-500">Vælg app'ens farver</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <div class="space-y-3">
-                                            <div class="flex items-center gap-3">
-                                                <label for="primary-color" class="text-sm w-24">Primær:</label>
-                                                <div class="relative">
-                                                    <input type="text" id="primary-color" value="#007AFF" class="w-32 border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                                    <input type="color" id="primary-color-picker" value="#007AFF" class="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 p-0 border-0 rounded cursor-pointer">
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center gap-3">
-                                                <label for="secondary-color" class="text-sm w-24">Sekundær:</label>
-                                                <div class="relative">
-                                                    <input type="text" id="secondary-color" value="#34C759" class="w-32 border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                                    <input type="color" id="secondary-color-picker" value="#34C759" class="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 p-0 border-0 rounded cursor-pointer">
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center gap-3">
-                                                <label for="accent-color" class="text-sm w-24">Accent:</label>
-                                                <div class="relative">
-                                                    <input type="text" id="accent-color" value="#FF9500" class="w-32 border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                                    <input type="color" id="accent-color-picker" value="#FF9500" class="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 p-0 border-0 rounded cursor-pointer">
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center gap-3">
-                                                <label for="danger-color" class="text-sm w-24">Danger:</label>
-                                                <div class="relative">
-                                                    <input type="text" id="danger-color" value="#FF3B30" class="w-32 border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                                    <input type="color" id="danger-color-picker" value="#FF3B30" class="absolute right-2 top-1/2 transform -translate-y-1/2 w-6 h-6 p-0 border-0 rounded cursor-pointer">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Font Selection -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                                    <div class="md:col-span-1">
-                                        <label for="font-family" class="font-medium">Skrifttype</label>
-                                        <p class="text-sm text-gray-500">Vælg app'ens skrifttype</p>
-                                    </div>
-                                    <div class="md:col-span-2">
-                                        <select id="font-family" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                            <option value="poppins">Poppins</option>
-                                            <option value="roboto">Roboto</option>
-                                            <option value="open-sans">Open Sans</option>
-                                            <option value="montserrat">Montserrat</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-gray-50 px-6 py-4 flex justify-end">
-                                <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                    Gem ændringer
-                                </button>
-                            </div>
-                        </section>
-
-                        <!-- Modules Settings -->
-                        <section id="modules" class="bg-white rounded-xl shadow overflow-hidden">
-                            <div class="border-b border-gray-200 px-4 py-3 flex justify-between items-center">
-                                <h2 class="font-bold text-lg text-gray-800">Moduler</h2>
-                                <button class="text-primary hover:text-primary/80 transition-colors">
-                                    <i class="fas fa-info-circle"></i>
-                                </button>
-                            </div>
-                            <div class="p-4 sm:p-6">
-                                <p class="text-sm text-gray-500 mb-4">Aktivér eller deaktivér funktionsmoduler i app'en</p>
                                 
-                                <div class="space-y-3">
-                                    <!-- Madplan Module -->
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div class="flex items-center gap-3">
-                                            <div class="rounded-full p-2 bg-primary/10 text-primary">
-                                                <i class="fas fa-utensils"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium">Madplan</h3>
-                                                <p class="text-xs text-gray-500">Ukentlig madplanlægning</p>
-                                            </div>
-                                        </div>
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer" checked>
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                    </div>
-
-                                    <!-- Begivenheder Module -->
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div class="flex items-center gap-3">
-                                            <div class="rounded-full p-2 bg-primary/10 text-primary">
-                                                <i class="fas fa-calendar-alt"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium">Begivenheder</h3>
-                                                <p class="text-xs text-gray-500">Planlægning af arrangementer</p>
-                                            </div>
-                                        </div>
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer" checked>
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                    </div>
-
-                                    <!-- Beskeder Module -->
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div class="flex items-center gap-3">
-                                            <div class="rounded-full p-2 bg-primary/10 text-primary">
-                                                <i class="fas fa-comments"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium">Beskeder</h3>
-                                                <p class="text-xs text-gray-500">Intern kommunikation</p>
-                                            </div>
-                                        </div>
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer" checked>
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                    </div>
-
-                                    <!-- Vaskeri Module -->
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div class="flex items-center gap-3">
-                                            <div class="rounded-full p-2 bg-primary/10 text-primary">
-                                                <i class="fas fa-tshirt"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium">Vaskeri</h3>
-                                                <p class="text-xs text-gray-500">Vasketidsbooking</p>
-                                            </div>
-                                        </div>
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer">
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                    </div>
-
-                                    <!-- Vedligehold Module -->
-                                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                        <div class="flex items-center gap-3">
-                                            <div class="rounded-full p-2 bg-primary/10 text-primary">
-                                                <i class="fas fa-tools"></i>
-                                            </div>
-                                            <div>
-                                                <h3 class="font-medium">Vedligehold</h3>
-                                                <p class="text-xs text-gray-500">Reparationsanmodninger</p>
-                                            </div>
-                                        </div>
-                                        <label class="inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" value="" class="sr-only peer" checked>
-                                            <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/50 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                        </label>
-                                    </div>
+                                <div>
+                                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
+                                    <input type="text" id="name" name="name" value="<?php echo $_SESSION['name']; ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                </div>
+                                
+                                <div>
+                                    <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
+                                    <input type="text" id="username" name="username" value="<?php echo $_SESSION['username']; ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
+                                    <input type="text" value="<?php echo ucfirst($_SESSION['role']); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
+                                </div>
+                                
+                                <div class="pt-2">
+                                    <button id="save-personal-info" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
+                                        Gem ændringer
+                                    </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div class="bg-gray-50 px-6 py-4 flex justify-end">
-                                <button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                    Gem ændringer
+                    <!-- Skift adgangskode -->
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="border-b border-gray-200 px-4 py-3">
+                            <h2 class="font-bold text-lg text-gray-800">Skift adgangskode</h2>
+                        </div>
+                        
+                        <div class="p-4 sm:p-6 space-y-4">
+                            <div>
+                                <label for="current-password" class="block text-sm font-medium text-gray-700 mb-1">Nuværende adgangskode</label>
+                                <input type="password" id="current-password" name="current_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            </div>
+
+                            <div>
+                                <label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">Ny adgangskode</label>
+                                <input type="password" id="new-password" name="new_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                <p class="text-xs text-gray-500 mt-1">Mindst 8 tegn</p>
+                            </div>
+
+                            <div>
+                                <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">Bekræft adgangskode</label>
+                                <input type="password" id="confirm-password" name="confirm_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            </div>
+                            
+                            <div class="pt-2">
+                                <button id="save-password" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
+                                    Opdater adgangskode
                                 </button>
                             </div>
-                        </section>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Administratorsektion - vises kun for administratorer -->
+                <?php if ($_SESSION['role'] === 'Administrator'): ?>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Tilføj bruger -->
+                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="border-b border-gray-200 px-4 py-3">
+                            <h2 class="font-bold text-lg text-gray-800">Tilføj bruger</h2>
+                        </div>
+                        
+                        <div class="p-4 sm:p-6 space-y-4">
+                            <form id="add-user-form" action="add-user.php" method="POST">
+                                <div class="space-y-4">
+                                    <div>
+                                        <label for="new-user-name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
+                                        <input type="text" id="new-user-name" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="new-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input type="email" id="new-user-email" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+                                    
+                                    <div>
+                                        <label for="new-username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
+                                        <input type="text" id="new-username" name="username" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+
+                                    <div>
+                                        <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Adgangskode</label>
+                                        <input type="password" id="new-user-password" name="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+
+                                    <div>
+                                        <label for="new-user-role" class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
+                                        <select id="new-user-role" name="role" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <option value="Personale">Personale</option>
+                                            <option value="Administrator">Administrator</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="pt-2">
+                                        <button type="submit" class="w-full bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
+                                            <i class="fas fa-plus mr-1"></i> Tilføj bruger
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Personaleliste - spænder over 2 kolonner -->
+                    <div class="lg:col-span-2 bg-white rounded-xl shadow overflow-hidden">
+                        <div class="border-b border-gray-200 px-4 py-3">
+                            <h2 class="font-bold text-lg text-gray-800">Personaleliste</h2>
+                        </div>
+                        
+                        <div class="p-4 sm:p-6">
+                            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                ID
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Navn
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Brugernavn
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Email
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Rolle
+                                            </th>
+                                            <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Handlinger
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        <?php foreach ($staff_users as $user): ?>
+                                        <tr>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo $user['id']; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <div class="flex items-center">
+                                                    <div class="flex-shrink-0 h-10 w-10">
+                                                        <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                            <?php echo strtoupper(substr($user['name'], 0, 2)); ?>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ml-4">
+                                                        <div class="text-sm font-medium text-gray-900">
+                                                            <?php echo $user['name']; ?>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo $user['username']; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                <?php echo isset($user['email']) ? $user['email'] : 'Ingen email'; ?>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap">
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $user['role'] === 'Administrator' ? 'bg-primary/10 text-primary' : 'bg-green-100 text-green-800'; ?>">
+                                                    <?php echo $user['role']; ?>
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                                <a href="#" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-primary mr-2">
+                                                    <i class="fas fa-pencil-alt"></i>
+                                                </a>
+                                                <a href="#" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600">
+                                                    <i class="fas fa-trash"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                        <?php if (count($staff_users) === 0): ?>
+                                        <tr>
+                                            <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                                Ingen brugere fundet
+                                            </td>
+                                        </tr>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <?php endif; ?>
             </div>
         </main>
     </div>
 
     <script>
-        // Sync color inputs with their pickers
         document.addEventListener('DOMContentLoaded', function() {
-            const colorInputs = [
-                { text: 'primary-color', picker: 'primary-color-picker' },
-                { text: 'secondary-color', picker: 'secondary-color-picker' },
-                { text: 'accent-color', picker: 'accent-color-picker' },
-                { text: 'danger-color', picker: 'danger-color-picker' }
-            ];
-            
-            colorInputs.forEach(pair => {
-                const textInput = document.getElementById(pair.text);
-                const colorPicker = document.getElementById(pair.picker);
+            // Save personal info
+            document.getElementById('save-personal-info').addEventListener('click', function() {
+                const name = document.getElementById('name').value;
+                const username = document.getElementById('username').value;
                 
-                colorPicker.addEventListener('input', () => {
-                    textInput.value = colorPicker.value;
-                });
+                if (name.trim() === '' || username.trim() === '') {
+                    showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
+                    return;
+                }
                 
-                textInput.addEventListener('input', () => {
-                    if (/^#[0-9A-F]{6}$/i.test(textInput.value)) {
-                        colorPicker.value = textInput.value;
-                    }
-                });
+                // AJAX call her til backend (simuleret)
+                setTimeout(() => {
+                    showAlert('Success', 'Dine personlige oplysninger er blevet opdateret', 'success');
+                }, 500);
             });
+            
+            // Save password
+            document.getElementById('save-password').addEventListener('click', function() {
+                const currentPassword = document.getElementById('current-password').value;
+                const newPassword = document.getElementById('new-password').value;
+                const confirmPassword = document.getElementById('confirm-password').value;
+                
+                if (currentPassword.trim() === '' || newPassword.trim() === '' || confirmPassword.trim() === '') {
+                    showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
+                    return;
+                }
+                
+                if (newPassword !== confirmPassword) {
+                    showAlert('Fejl', 'De nye adgangskoder matcher ikke', 'error');
+                    return;
+                }
+                
+                if (newPassword.length < 8) {
+                    showAlert('Fejl', 'Adgangskoden skal være mindst 8 tegn', 'error');
+                    return;
+                }
+                
+                // AJAX call her til backend (simuleret)
+                setTimeout(() => {
+                    showAlert('Success', 'Din adgangskode er blevet opdateret', 'success');
+                    document.getElementById('current-password').value = '';
+                    document.getElementById('new-password').value = '';
+                    document.getElementById('confirm-password').value = '';
+                }, 500);
+            });
+            
+            <?php if ($_SESSION['role'] === 'Administrator'): ?>
+            // Form validation for add user form
+            document.getElementById('add-user-form').addEventListener('submit', function(e) {
+                const newUserName = document.getElementById('new-user-name').value;
+                const newUserEmail = document.getElementById('new-user-email').value;
+                const newUsername = document.getElementById('new-username').value;
+                const newUserPassword = document.getElementById('new-user-password').value;
+                
+                if (newUserName.trim() === '' || newUsername.trim() === '' || newUserPassword.trim() === '' || newUserEmail.trim() === '') {
+                    e.preventDefault();
+                    showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
+                    return false;
+                }
+                
+                if (newUserPassword.length < 8) {
+                    e.preventDefault();
+                    showAlert('Fejl', 'Adgangskoden skal være mindst 8 tegn', 'error');
+                    return false;
+                }
+                
+                // Formularen er valid og vil blive sendt
+                return true;
+            });
+            <?php endif; ?>
+            
+            // Helper function to show alerts
+            function showAlert(title, message, type) {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'fixed top-6 right-6 p-4 rounded-lg shadow-lg z-50 flex items-center gap-3 ' + 
+                    (type === 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' : 'bg-red-100 border-l-4 border-red-500 text-red-700');
+                
+                alertDiv.innerHTML = `
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                    <div>
+                        <h3 class="font-bold">${title}</h3>
+                        <p>${message}</p>
+                    </div>
+                `;
+                
+                document.body.appendChild(alertDiv);
+                
+                // Fade in
+                alertDiv.style.opacity = '0';
+                alertDiv.style.transition = 'opacity 0.3s ease-in-out';
+                setTimeout(() => {
+                    alertDiv.style.opacity = '1';
+                }, 10);
+                
+                // Remove after 3 seconds
+                setTimeout(() => {
+                    alertDiv.style.opacity = '0';
+                    setTimeout(() => {
+                        document.body.removeChild(alertDiv);
+                    }, 300);
+                }, 3000);
+            }
         });
     </script>
 </body>
