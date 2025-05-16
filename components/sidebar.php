@@ -60,6 +60,18 @@ if (!isset($_SESSION['user_id'])) {
                 </a>
             </li>
             <li>
+                <a href="<?=$base?>employee" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'employee' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
+                    <i class="fa-solid fa-address-card"></i>
+                    <span>Ansatte</span>
+                </a>
+            </li>
+            <li>
+                <a href="<?=$base?>messages" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'messages' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
+                    <i class="fa-solid fa-comments"></i>
+                    <span>Beskeder</span>
+                </a>
+            </li>
+            <li>
                 <a href="<?=$base?>settings/" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'settings' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                     <i class="fas fa-cog"></i>
                     <span>Indstillinger</span>

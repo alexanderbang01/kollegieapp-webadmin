@@ -32,6 +32,18 @@ CREATE TABLE residents (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+-- Opdateret employee table (med alle students-tabel felter)
+CREATE TABLE employee (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    phone VARCHAR(20) NOT NULL,
+    profesion VARCHAR(255) NOT NULL,
+    profile_image VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
 
 -- Foodplan table (madplan)
 CREATE TABLE foodplan (
@@ -150,6 +162,11 @@ INSERT INTO users (username, password, name, email, role) VALUES
 INSERT INTO residents (first_name, last_name, email, phone, room_number, contact_name, contact_phone, profile_image) VALUES
 ('Alexander', 'Jensen', 'alexander@example.com', '+45 12 34 56 78', 'A-204', 'Marie Jensen', '+45 87 65 43 21', NULL),
 ('Emma', 'Nielsen', 'emma@example.com', '+45 23 45 67 89', 'B-103', 'Jens Nielsen', '+45 98 76 54 32', NULL);
+
+-- Sample employee (ansatte) - opdateret til kun at bruge de kolonner der findes i tabellen
+INSERT INTO employee (first_name, last_name, email, phone, profesion, profile_image) VALUES
+('Peter', 'Olesen', 'Peter@example.com', '+45 87 65 43 21', 'pedel', NULL),
+('Lene', 'schulz', 'Lene@example.com', '+45 92 83 74 16', 'rengøring', NULL);
 
 -- Sample news
 INSERT INTO news (title, content, is_featured, created_by) VALUES
