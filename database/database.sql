@@ -120,6 +120,24 @@ CREATE TABLE news_reads (
     UNIQUE KEY (news_id, resident_id)
 );
 
+-- Messages table med bedre sikkerhedsstruktur
+CREATE TABLE messages (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    sender_id INT NOT NULL,
+    sender_type ENUM('staff', 'resident') NOT NULL,
+    recipient_id INT NOT NULL,
+    recipient_type ENUM('staff', 'resident') NOT NULL,
+    content TEXT NOT NULL,
+    encryption_iv VARCHAR(32) DEFAULT NULL,
+    is_encrypted TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL DEFAULT NULL,
+    INDEX idx_sender (sender_id, sender_type),
+    INDEX idx_recipient (recipient_id, recipient_type),
+    INDEX idx_created (created_at),
+    INDEX idx_read (read_at)
+);
+
 -- Activities log (aktivitetslog)
 CREATE TABLE activities (
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -12,7 +12,145 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-include 'components/header.php'; 
+include 'components/header.php';
+include 'database/db_conn.php';
+
+// Hent dashboard data fra databasen
+$dashboardData = [
+    'totalResidents' => 0,
+    'activeEvents' => 0,
+    'lastFoodplanUpdate' => null,
+    'unreadMessages' => 0
+];
+
+// Funktion til at formatere datoer på dansk uden årstal
+function formatDanishDate($date, $includeYear = false) {
+    $months = [
+        'January' => 'januar',
+        'February' => 'februar',
+        'March' => 'marts',
+        'April' => 'april',
+        'May' => 'maj',
+        'June' => 'juni',
+        'July' => 'juli',
+        'August' => 'august',
+        'September' => 'september',
+        'October' => 'oktober',
+        'November' => 'november',
+        'December' => 'december'
+    ];
+    
+    $format = $includeYear ? 'j. F Y' : 'j. F';
+    $englishDate = date($format, strtotime($date));
+    
+    foreach ($months as $english => $danish) {
+        $englishDate = str_replace($english, $danish, $englishDate);
+    }
+    
+    return $englishDate;
+}
+
+// Funktion til at afkorte tekst
+function truncateText($text, $maxLength = 90) {
+    if (strlen($text) <= $maxLength) {
+        return $text;
+    }
+    
+    return substr($text, 0, $maxLength) . '...';
+}
+
+// 1. Hent antal beboere
+if ($conn) {
+    $result = $conn->query("SELECT COUNT(*) as count FROM residents");
+    if ($result && $row = $result->fetch_assoc()) {
+        $dashboardData['totalResidents'] = $row['count'];
+    }
+    
+    // 2. Hent antal kommende begivenheder
+    $today = date('Y-m-d');
+    $result = $conn->query("SELECT COUNT(*) as count FROM events WHERE date >= '$today'");
+    if ($result && $row = $result->fetch_assoc()) {
+        $dashboardData['activeEvents'] = $row['count'];
+    }
+    
+    // 3. Hent dato for seneste madplans-opdatering
+    $result = $conn->query("SELECT updated_at FROM foodplan ORDER BY updated_at DESC LIMIT 1");
+    if ($result && $row = $result->fetch_assoc()) {
+        $dashboardData['lastFoodplanUpdate'] = $row['updated_at'];
+    }
+    
+    // 4. Hent antal ulæste beskeder
+    $userId = $_SESSION['user_id'];
+    $result = $conn->query("SELECT COUNT(*) as count FROM messages WHERE recipient_id = $userId AND recipient_type = 'staff' AND read_at IS NULL");
+    if ($result && $row = $result->fetch_assoc()) {
+        $dashboardData['unreadMessages'] = $row['count'];
+    }
+    
+    // 5. Hent den aktuelle madplan (for indeværende uge)
+    $weekNumber = date('W');
+    $year = date('Y');
+    $currentFoodplan = null;
+    
+    $stmt = $conn->prepare("SELECT * FROM foodplan WHERE week_number = ? AND year = ?");
+    $stmt->bind_param("ii", $weekNumber, $year);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    if ($result && $result->num_rows > 0) {
+        $currentFoodplan = $result->fetch_assoc();
+        
+        // Hent allergener for hver dag
+        $stmt = $conn->prepare("
+            SELECT fa.day_of_week, a.name
+            FROM foodplan_allergens fa
+            JOIN allergens a ON fa.allergen_id = a.id
+            WHERE fa.foodplan_id = ?
+        ");
+        $stmt->bind_param("i", $currentFoodplan['id']);
+        $stmt->execute();
+        $allergensResult = $stmt->get_result();
+        
+        $foodplanAllergens = [];
+        while ($row = $allergensResult->fetch_assoc()) {
+            $foodplanAllergens[$row['day_of_week']][] = $row['name'];
+        }
+    }
+    
+    // 6. Hent kommende begivenheder
+    $upcomingEvents = [];
+    $result = $conn->query("
+        SELECT e.*, COUNT(ep.resident_id) as participant_count 
+        FROM events e
+        LEFT JOIN event_participants ep ON e.id = ep.event_id
+        WHERE e.date >= '$today'
+        GROUP BY e.id
+        ORDER BY e.date ASC, e.time ASC
+        LIMIT 3
+    ");
+    
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $upcomingEvents[] = $row;
+        }
+    }
+    
+    // 7. Hent seneste aktiviteter
+    $recentActivities = [];
+    $result = $conn->query("
+        SELECT a.*, u.name AS user_name, r.first_name, r.last_name
+        FROM activities a
+        LEFT JOIN users u ON a.user_id = u.id
+        LEFT JOIN residents r ON a.resident_id = r.id
+        ORDER BY a.created_at DESC
+        LIMIT 3
+    ");
+    
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $recentActivities[] = $row;
+        }
+    }
+}
 ?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
@@ -37,7 +175,7 @@ include 'components/header.php';
                         </div>
                         <div>
                             <p class="text-gray-500 text-xs sm:text-sm">Totale Beboere</p>
-                            <p class="text-xl sm:text-2xl font-bold">112</p>
+                            <p class="text-xl sm:text-2xl font-bold"><?php echo $dashboardData['totalResidents']; ?></p>
                         </div>
                     </div>
 
@@ -48,7 +186,7 @@ include 'components/header.php';
                         </div>
                         <div>
                             <p class="text-gray-500 text-xs sm:text-sm">Aktive Begivenheder</p>
-                            <p class="text-xl sm:text-2xl font-bold">24</p>
+                            <p class="text-xl sm:text-2xl font-bold"><?php echo $dashboardData['activeEvents']; ?></p>
                         </div>
                     </div>
 
@@ -59,20 +197,26 @@ include 'components/header.php';
                         </div>
                         <div>
                             <p class="text-gray-500 text-xs sm:text-sm">Madplan Status</p>
-                            <p class="text-xl sm:text-2xl font-bold">
-                                <span class="text-secondary">Ajourført</span>
+                            <p class="text-sm sm:text-base font-bold">
+                                <?php 
+                                if ($dashboardData['lastFoodplanUpdate']) {
+                                    echo 'Opdateret ' . formatDanishDate($dashboardData['lastFoodplanUpdate']);
+                                } else {
+                                    echo 'Ikke opdateret';
+                                }
+                                ?>
                             </p>
                         </div>
                     </div>
 
-                    <!-- Aktive Anmodninger Card -->
+                    <!-- Ulæste Beskeder Card (erstattet Aktive Anmodninger) -->
                     <div class="bg-white rounded-xl p-4 sm:p-6 shadow animate-fade-in delay-400 flex items-center">
                         <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-danger/10 text-danger mr-3 sm:mr-4 flex items-center justify-center">
-                            <i class="fas fa-clipboard-list text-lg sm:text-xl"></i>
+                            <i class="fas fa-envelope text-lg sm:text-xl"></i>
                         </div>
                         <div>
-                            <p class="text-gray-500 text-xs sm:text-sm">Aktive Anmodninger</p>
-                            <p class="text-xl sm:text-2xl font-bold">5</p>
+                            <p class="text-gray-500 text-xs sm:text-sm">Ulæste Beskeder</p>
+                            <p class="text-xl sm:text-2xl font-bold"><?php echo $dashboardData['unreadMessages']; ?></p>
                         </div>
                     </div>
                 </div>
@@ -86,95 +230,76 @@ include 'components/header.php';
                                 <h2 class="text-lg sm:text-xl font-bold">Ugens Madplan</h2>
                                 <a href="<?= $base ?>foodplan/" class="text-primary hover:underline text-xs sm:text-sm">Redigér</a>
                             </div>
+                            
+                            <?php if ($currentFoodplan): ?>
                             <div class="overflow-x-auto">
                                 <table class="w-full min-w-full">
                                     <thead>
                                         <tr class="text-left">
                                             <th class="pb-2 text-sm font-medium text-gray-500">Dag</th>
                                             <th class="pb-2 text-sm font-medium text-gray-500">Ret</th>
-                                            <th class="pb-2 text-sm font-medium text-gray-500">Tidspunkt</th>
                                             <th class="pb-2 text-sm font-medium text-gray-500">Allergener</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <!-- Mandag -->
-                                        <tr class="border-t border-gray-100">
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium text-gray-800">Mandag</p>
-                                                <p class="text-xs text-gray-500">1. maj</p>
+                                        <?php 
+                                        // Bestem den aktuelle ugedag (1 = mandag, 7 = søndag)
+                                        $currentWeekday = date('N');
+                                        $weekdays = [
+                                            1 => ['name' => 'Mandag', 'key' => 'monday'],
+                                            2 => ['name' => 'Tirsdag', 'key' => 'tuesday'],
+                                            3 => ['name' => 'Onsdag', 'key' => 'wednesday'],
+                                            4 => ['name' => 'Torsdag', 'key' => 'thursday']
+                                        ];
+                                        
+                                        foreach ($weekdays as $dayNum => $day) {
+                                            $isCurrentDay = ($dayNum == $currentWeekday);
+                                            $rowClass = $isCurrentDay ? 'bg-primary/5' : '';
+                                            $tdClass = $isCurrentDay ? 'border-l-4 border-primary pl-2' : '';
+                                        ?>
+                                        <!-- <?php echo $day['name']; ?> -->
+                                        <tr class="border-t border-gray-100 <?php echo $rowClass; ?>">
+                                            <td class="py-3 pr-2 <?php echo $tdClass; ?>">
+                                                <p class="font-medium text-gray-800"><?php echo $day['name']; ?></p>
+                                                <p class="text-xs text-gray-500"><?php echo date('j. M', strtotime($day['key'] . " this week")); ?></p>
                                             </td>
                                             <td class="py-3 pr-2">
-                                                <p class="font-medium">Lasagne med salat</p>
-                                                <p class="text-xs text-gray-500">Hjemmelavet lasagne med oksekød og grøn salat</p>
+                                                <?php if (!empty($currentFoodplan[$day['key'] . '_dish'])): ?>
+                                                <p class="font-medium"><?php echo htmlspecialchars($currentFoodplan[$day['key'] . '_dish']); ?></p>
+                                                <p class="text-xs text-gray-500">
+                                                    <?php 
+                                                    $description = $currentFoodplan[$day['key'] . '_description'];
+                                                    echo htmlspecialchars(truncateText($description, 90));
+                                                    ?>
+                                                </p>
+                                                <?php else: ?>
+                                                <p class="text-gray-500 italic">Ingen ret planlagt</p>
+                                                <?php endif; ?>
                                             </td>
-                                            <td class="py-3 pr-2 text-primary">18:00</td>
                                             <td class="py-3">
                                                 <div class="flex flex-wrap gap-1">
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
+                                                    <?php 
+                                                    if (isset($foodplanAllergens[$day['key']]) && !empty($foodplanAllergens[$day['key']])) {
+                                                        foreach ($foodplanAllergens[$day['key']] as $allergen) {
+                                                            echo '<span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">' . htmlspecialchars($allergen) . '</span>';
+                                                        }
+                                                    } else {
+                                                        echo '<span class="text-gray-500 text-xs">Ingen allergener angivet</span>';
+                                                    }
+                                                    ?>
                                                 </div>
                                             </td>
                                         </tr>
-
-                                        <!-- Tirsdag -->
-                                        <tr class="border-t border-gray-100">
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium text-gray-800">Tirsdag</p>
-                                                <p class="text-xs text-gray-500">2. maj</p>
-                                            </td>
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium">Kylling i karry</p>
-                                                <p class="text-xs text-gray-500">Kylling i karrysauce med ris og nanbrød</p>
-                                            </td>
-                                            <td class="py-3 pr-2 text-primary">18:00</td>
-                                            <td class="py-3">
-                                                <div class="flex flex-wrap gap-1">
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-
-                                        <!-- Onsdag (aktiv dag) -->
-                                        <tr class="border-t border-gray-100 bg-primary/5">
-                                            <td class="py-3 pr-2 border-l-4 border-primary pl-2">
-                                                <p class="font-medium text-gray-800">Onsdag</p>
-                                                <p class="text-xs text-gray-500">3. maj</p>
-                                            </td>
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium">Pasta Carbonara</p>
-                                                <p class="text-xs text-gray-500">Klassisk italiensk ret med bacon, æg og parmesan</p>
-                                            </td>
-                                            <td class="py-3 pr-2 text-primary">18:00</td>
-                                            <td class="py-3">
-                                                <div class="flex flex-wrap gap-1">
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Æg</span>
-                                                </div>
-                                            </td>
-                                        </tr>
-
-                                        <!-- Torsdag -->
-                                        <tr class="border-t border-gray-100">
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium text-gray-800">Torsdag</p>
-                                                <p class="text-xs text-gray-500">4. maj</p>
-                                            </td>
-                                            <td class="py-3 pr-2">
-                                                <p class="font-medium">Taco torsdag</p>
-                                                <p class="text-xs text-gray-500">Tacos med oksekød, salsa, guacamole og tilbehør</p>
-                                            </td>
-                                            <td class="py-3 pr-2 text-primary">18:00</td>
-                                            <td class="py-3">
-                                                <div class="flex flex-wrap gap-1">
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Gluten</span>
-                                                    <span class="px-1.5 py-0.5 bg-gray-200 text-gray-700 text-xs rounded-full">Laktose</span>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                        <?php } ?>
                                     </tbody>
                                 </table>
                             </div>
+                            <?php else: ?>
+                            <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                <p class="text-gray-500">Ingen madplan fundet for denne uge</p>
+                                <a href="<?= $base ?>foodplan/" class="inline-block mt-2 text-primary hover:underline">Opret ugens madplan</a>
+                            </div>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -206,7 +331,7 @@ include 'components/header.php';
                     </div>
                 </div>
 
-                <!-- Kommende Begivenheder og Seneste Aktiviteter Byttet -->
+                <!-- Kommende Begivenheder og Seneste Aktiviteter -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6 mt-4 sm:mt-8">
                     <!-- Kommende Begivenheder -->
                     <div class="bg-white rounded-xl shadow p-4 sm:p-6 animate-fade-in delay-100">
@@ -214,32 +339,32 @@ include 'components/header.php';
                             <h2 class="text-lg sm:text-xl font-bold">Kommende Begivenheder</h2>
                             <a href="<?= $base ?>events/" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
                         </div>
-                        <div class="space-y-3 sm:space-y-4">
-                            <div class="border-l-4 border-primary pl-2 sm:pl-4">
-                                <div class="flex justify-between">
-                                    <span class="text-primary font-medium text-xs sm:text-sm">Fredag, 5. maj</span>
-                                    <span class="text-gray-500 text-xs">20:00</span>
-                                </div>
-                                <h3 class="font-bold text-sm sm:text-base">Filmaften</h3>
-                                <p class="text-gray-600 text-xs">Fællesrummet • 15 tilmeldte</p>
-                            </div>
-                            <div class="border-l-4 border-secondary pl-2 sm:pl-4">
-                                <div class="flex justify-between">
-                                    <span class="text-secondary font-medium text-xs sm:text-sm">Lørdag, 6. maj</span>
-                                    <span class="text-gray-500 text-xs">19:00</span>
-                                </div>
-                                <h3 class="font-bold text-sm sm:text-base">Brætspilsaften</h3>
-                                <p class="text-gray-600 text-xs">Fællesrummet, 3. etage • 8 tilmeldte</p>
-                            </div>
-                            <div class="border-l-4 border-accent pl-2 sm:pl-4">
-                                <div class="flex justify-between">
-                                    <span class="text-accent font-medium text-xs sm:text-sm">Søndag, 14. maj</span>
-                                    <span class="text-gray-500 text-xs">14:00</span>
-                                </div>
-                                <h3 class="font-bold text-sm sm:text-base">Generalforsamling</h3>
-                                <p class="text-gray-600 text-xs">Fællesrummet • 32 tilmeldte</p>
-                            </div>
+                        
+                        <?php if (empty($upcomingEvents)): ?>
+                        <div class="bg-gray-50 rounded-lg p-4 text-center">
+                            <p class="text-gray-500">Ingen kommende begivenheder</p>
+                            <a href="<?= $base ?>events/" class="inline-block mt-2 text-primary hover:underline">Opret en begivenhed</a>
                         </div>
+                        <?php else: ?>
+                        <div class="space-y-3 sm:space-y-4">
+                            <?php 
+                            $colors = ['primary', 'secondary', 'accent'];
+                            foreach ($upcomingEvents as $index => $event): 
+                                $color = $colors[$index % count($colors)];
+                                $formattedDate = formatDanishDate($event['date'], true);
+                                $formattedTime = date('H:i', strtotime($event['time']));
+                            ?>
+                            <div class="border-l-4 border-<?php echo $color; ?> pl-2 sm:pl-4">
+                                <div class="flex justify-between">
+                                    <span class="text-<?php echo $color; ?> font-medium text-xs sm:text-sm"><?php echo $formattedDate; ?></span>
+                                    <span class="text-gray-500 text-xs"><?php echo $formattedTime; ?></span>
+                                </div>
+                                <h3 class="font-bold text-sm sm:text-base"><?php echo htmlspecialchars($event['title']); ?></h3>
+                                <p class="text-gray-600 text-xs"><?php echo htmlspecialchars($event['location']); ?> • <?php echo $event['participant_count']; ?> tilmeldte</p>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
 
                     <!-- Seneste Aktiviteter -->
@@ -248,40 +373,56 @@ include 'components/header.php';
                             <h2 class="text-lg sm:text-xl font-bold">Seneste Aktiviteter</h2>
                             <a href="#" class="text-primary hover:underline text-xs sm:text-sm">Se alle</a>
                         </div>
-                        <div class="space-y-3 sm:space-y-4">
-                            <div class="flex items-start gap-2 sm:gap-4">
-                                <div class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                                    <i class="fas fa-calendar-plus text-sm sm:text-base"></i>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-sm sm:text-base">Ny begivenhed oprettet</p>
-                                    <p class="text-gray-600 text-xs sm:text-sm">Filmaften er planlagt til fredag d. 15. maj</p>
-                                    <p class="text-gray-400 text-xs mt-1">For 2 timer siden</p>
-                                </div>
-                            </div>
-                            <div class="border-t border-gray-200 my-2"></div>
-                            <div class="flex items-start gap-2 sm:gap-4">
-                                <div class="w-8 h-8 rounded-full bg-secondary/10 text-secondary flex items-center justify-center">
-                                    <i class="fas fa-utensils text-sm sm:text-base"></i>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-sm sm:text-base">Madplan opdateret</p>
-                                    <p class="text-gray-600 text-xs sm:text-sm">Madplanen for uge 20 er blevet opdateret</p>
-                                    <p class="text-gray-400 text-xs mt-1">For 5 timer siden</p>
-                                </div>
-                            </div>
-                            <div class="border-t border-gray-200 my-2"></div>
-                            <div class="flex items-start gap-2 sm:gap-4">
-                                <div class="w-8 h-8 rounded-full bg-accent/10 text-accent flex items-center justify-center">
-                                    <i class="fas fa-user-plus text-sm sm:text-base"></i>
-                                </div>
-                                <div>
-                                    <p class="font-medium text-sm sm:text-base">Ny beboer tilføjet</p>
-                                    <p class="text-gray-600 text-xs sm:text-sm">Mikkel Hansen er flyttet ind på værelse B12</p>
-                                    <p class="text-gray-400 text-xs mt-1">For 1 dag siden</p>
-                                </div>
-                            </div>
+                        
+                        <?php if (empty($recentActivities)): ?>
+                        <div class="bg-gray-50 rounded-lg p-4 text-center">
+                            <p class="text-gray-500">Ingen nylige aktiviteter registreret</p>
                         </div>
+                        <?php else: ?>
+                        <div class="space-y-3 sm:space-y-4">
+                            <?php 
+                            $icons = [
+                                'event_created' => ['fas fa-calendar-plus', 'primary'],
+                                'foodplan_updated' => ['fas fa-utensils', 'secondary'],
+                                'resident_added' => ['fas fa-user-plus', 'accent'],
+                                'news_created' => ['fas fa-newspaper', 'danger'],
+                                'default' => ['fas fa-history', 'primary']
+                            ];
+                            
+                            foreach ($recentActivities as $index => $activity): 
+                                // Bestem ikon og farve baseret på aktivitetstype
+                                $iconInfo = isset($icons[$activity['activity_type']]) ? $icons[$activity['activity_type']] : $icons['default'];
+                                [$icon, $color] = $iconInfo;
+                                
+                                // Beregn tidsforskel
+                                $activityTime = new DateTime($activity['created_at']);
+                                $now = new DateTime();
+                                $interval = $now->diff($activityTime);
+                                
+                                if ($interval->d > 0) {
+                                    $timeAgo = $interval->d . ' ' . ($interval->d == 1 ? 'dag' : 'dage') . ' siden';
+                                } elseif ($interval->h > 0) {
+                                    $timeAgo = $interval->h . ' ' . ($interval->h == 1 ? 'time' : 'timer') . ' siden';
+                                } else {
+                                    $timeAgo = $interval->i . ' ' . ($interval->i == 1 ? 'minut' : 'minutter') . ' siden';
+                                }
+                            ?>
+                            <?php if ($index > 0): ?>
+                            <div class="border-t border-gray-200 my-2"></div>
+                            <?php endif; ?>
+                            
+                            <div class="flex items-start gap-2 sm:gap-4">
+                                <div class="w-8 h-8 rounded-full bg-<?php echo $color; ?>/10 text-<?php echo $color; ?> flex items-center justify-center">
+                                    <i class="<?php echo $icon; ?> text-sm sm:text-base"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-sm sm:text-base"><?php echo htmlspecialchars(truncateText($activity['description'], 100)); ?></p>
+                                    <p class="text-gray-400 text-xs mt-1"><?php echo $timeAgo; ?></p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -294,35 +435,39 @@ include 'components/header.php';
         const mobileSidebar = document.getElementById('mobile-sidebar');
         const closeMobileMenu = document.getElementById('close-mobile-menu');
 
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileSidebar.classList.remove('hidden');
-        });
+        if (mobileMenuBtn && mobileSidebar && closeMobileMenu) {
+            mobileMenuBtn.addEventListener('click', () => {
+                mobileSidebar.classList.remove('hidden');
+            });
 
-        closeMobileMenu.addEventListener('click', () => {
-            mobileSidebar.classList.add('hidden');
-        });
-
-        // Close mobile menu when clicking outside
-        mobileSidebar.addEventListener('click', (e) => {
-            if (e.target === mobileSidebar) {
+            closeMobileMenu.addEventListener('click', () => {
                 mobileSidebar.classList.add('hidden');
-            }
-        });
+            });
+
+            // Close mobile menu when clicking outside
+            mobileSidebar.addEventListener('click', (e) => {
+                if (e.target === mobileSidebar) {
+                    mobileSidebar.classList.add('hidden');
+                }
+            });
+        }
 
         // User dropdown toggle
         const userMenuBtn = document.getElementById('user-menu-btn');
         const userDropdown = document.getElementById('user-dropdown');
 
-        userMenuBtn.addEventListener('click', () => {
-            userDropdown.classList.toggle('hidden');
-        });
+        if (userMenuBtn && userDropdown) {
+            userMenuBtn.addEventListener('click', () => {
+                userDropdown.classList.toggle('hidden');
+            });
 
-        // Close user dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
-                userDropdown.classList.add('hidden');
-            }
-        });
+            // Close user dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (userMenuBtn && userDropdown && !userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                    userDropdown.classList.add('hidden');
+                }
+            });
+        }
     </script>
 </body>
 
