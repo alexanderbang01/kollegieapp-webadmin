@@ -17,12 +17,24 @@ include '../database/db_conn.php';
 // Hent brugerdata fra databasen hvis brugeren er administrator
 $staff_users = [];
 if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
-    $stmt = $conn->prepare("SELECT id, username, name, email, role FROM users ORDER BY role DESC, name ASC");
+    $stmt = $conn->prepare("SELECT id, username, name, email, phone, role, profession, profile_image FROM users ORDER BY role DESC, name ASC");
     $stmt->execute();
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
         $staff_users[] = $row;
+    }
+}
+
+// Hent den nuværende brugers fulde profil
+$current_user = [];
+if (isset($conn)) {
+    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+    $stmt->bind_param("i", $_SESSION['user_id']);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows > 0) {
+        $current_user = $result->fetch_assoc();
     }
 }
 ?>
@@ -85,16 +97,38 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                 <?php endif; ?>
 
                 <!-- Main settings area med side-by-side layout -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Personlig profil -->
-                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                    <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
                         <div class="border-b border-gray-200 px-4 py-3">
                             <h2 class="font-bold text-lg text-gray-800">Personlig profil</h2>
                         </div>
 
                         <div class="p-4 sm:p-6">
-                            <form id="update-profile-form" action="update-profile.php" method="POST">
+                            <form id="update-profile-form" action="update-profile.php" method="POST" enctype="multipart/form-data">
                                 <div class="space-y-4">
+                                    <!-- Profilbillede -->
+                                    <div class="flex flex-col items-center mb-6">
+                                        <div class="relative">
+                                            <div id="current-profile-preview" class="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center">
+                                                <?php if (!empty($current_user['profile_image']) && file_exists("../employees/images/" . $current_user['profile_image'])): ?>
+                                                    <img src="../employees/images/<?php echo htmlspecialchars($current_user['profile_image']); ?>" alt="Profilbillede" class="w-full h-full object-cover">
+                                                <?php else: ?>
+                                                    <?php
+                                                    $name_parts = explode(' ', $current_user['name'] ?? '');
+                                                    $initials = strtoupper(substr($name_parts[0], 0, 1) . (isset($name_parts[1]) ? substr($name_parts[1], 0, 1) : ''));
+                                                    ?>
+                                                    <span class="text-2xl font-bold text-gray-500"><?php echo $initials; ?></span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <label for="profile-image-input" class="absolute bottom-0 right-0 bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
+                                                <i class="fas fa-camera text-sm"></i>
+                                            </label>
+                                        </div>
+                                        <input type="file" id="profile-image-input" name="profile_image" accept="image/*" class="hidden">
+                                        <p class="text-xs text-gray-500 mt-2 text-center">Klik på kamera-ikonet for at ændre billede</p>
+                                    </div>
+
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Bruger ID</label>
                                         <input type="text" value="<?php echo $_SESSION['user_id']; ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
@@ -102,17 +136,32 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
 
                                     <div>
                                         <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
-                                        <input type="text" id="name" name="name" value="<?php echo $_SESSION['name']; ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($current_user['name'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
-                                        <input type="text" id="username" name="username" value="<?php echo $_SESSION['username']; ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($current_user['username'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+
+                                    <div>
+                                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($current_user['email'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+
+                                    <div>
+                                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
+                                        <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($current_user['phone'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                    </div>
+
+                                    <div>
+                                        <label for="profession" class="block text-sm font-medium text-gray-700 mb-1">Profession</label>
+                                        <input type="text" id="profession" name="profession" value="<?php echo htmlspecialchars($current_user['profession'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
-                                        <input type="text" value="<?php echo ucfirst($_SESSION['role']); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
+                                        <input type="text" value="<?php echo ucfirst($current_user['role'] ?? ''); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
                                     </div>
 
                                     <div class="pt-2">
@@ -126,7 +175,7 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                     </div>
 
                     <!-- Skift adgangskode -->
-                    <div class="bg-white rounded-xl shadow overflow-hidden">
+                    <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
                         <div class="border-b border-gray-200 px-4 py-3">
                             <h2 class="font-bold text-lg text-gray-800">Skift adgangskode</h2>
                         </div>
@@ -165,40 +214,67 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                 <?php if ($_SESSION['role'] === 'Administrator'): ?>
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <!-- Tilføj bruger -->
-                        <div class="bg-white rounded-xl shadow overflow-hidden">
+                        <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
                             <div class="border-b border-gray-200 px-4 py-3">
                                 <h2 class="font-bold text-lg text-gray-800">Tilføj bruger</h2>
+                                <p class="text-sm text-gray-600 mt-1">Kun administratorer kan tilføje nye brugere til systemet</p>
                             </div>
 
                             <div class="p-4 sm:p-6 space-y-4">
-                                <form id="add-user-form" action="add-user.php" method="POST">
+                                <form id="add-user-form" action="add-user.php" method="POST" enctype="multipart/form-data">
                                     <div class="space-y-4">
-                                        <div>
-                                            <label for="new-user-name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
-                                            <input type="text" id="new-user-name" name="name" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <!-- Profilbillede upload -->
+                                        <div class="flex flex-col items-center mb-4">
+                                            <div class="relative">
+                                                <div id="new-user-image-preview" class="w-20 h-20 rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center">
+                                                    <i class="fas fa-user text-2xl text-gray-400"></i>
+                                                </div>
+                                                <label for="new-user-image-input" class="absolute bottom-0 right-0 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
+                                                    <i class="fas fa-camera text-xs"></i>
+                                                </label>
+                                            </div>
+                                            <input type="file" id="new-user-image-input" name="profile_image" accept="image/*" class="hidden">
+                                            <p class="text-xs text-gray-500 mt-1 text-center">Valgfrit profilbillede</p>
                                         </div>
 
                                         <div>
-                                            <label for="new-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                            <input type="email" id="new-user-email" name="email" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <label for="new-user-name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn <span class="text-red-500">*</span></label>
+                                            <input type="text" id="new-user-name" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                         </div>
 
                                         <div>
-                                            <label for="new-username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
-                                            <input type="text" id="new-username" name="username" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <label for="new-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+                                            <input type="email" id="new-user-email" name="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                         </div>
 
                                         <div>
-                                            <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Adgangskode</label>
-                                            <input type="password" id="new-user-password" name="password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <label for="new-username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn <span class="text-red-500">*</span></label>
+                                            <input type="text" id="new-username" name="username" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                         </div>
 
                                         <div>
-                                            <label for="new-user-role" class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
-                                            <select id="new-user-role" name="role" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Adgangskode <span class="text-red-500">*</span></label>
+                                            <input type="password" id="new-user-password" name="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <p class="text-xs text-gray-500 mt-1">Mindst 8 tegn</p>
+                                        </div>
+
+                                        <div>
+                                            <label for="new-user-phone" class="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
+                                            <input type="tel" id="new-user-phone" name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        </div>
+
+                                        <div>
+                                            <label for="new-user-profession" class="block text-sm font-medium text-gray-700 mb-1">Profession</label>
+                                            <input type="text" id="new-user-profession" name="profession" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        </div>
+
+                                        <div>
+                                            <label for="new-user-role" class="block text-sm font-medium text-gray-700 mb-1">Rolle <span class="text-red-500">*</span></label>
+                                            <select id="new-user-role" name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                                 <option value="Personale">Personale</option>
                                                 <option value="Administrator">Administrator</option>
                                             </select>
+                                            <p class="text-xs text-gray-500 mt-1">Administratorer kan tilføje andre brugere, personale kan ikke</p>
                                         </div>
 
                                         <div class="pt-2">
@@ -218,21 +294,15 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                             </div>
 
                             <div class="p-4 sm:p-6">
-                                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                <div class="overflow-x-auto rounded-lg border border-gray-200 max-h-[600px] overflow-y-auto">
                                     <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50">
+                                        <thead class="bg-gray-50 sticky top-0">
                                             <tr>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    ID
+                                                    Bruger
                                                 </th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Navn
-                                                </th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Brugernavn
-                                                </th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Email
+                                                    Kontakt
                                                 </th>
                                                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                                     Rolle
@@ -245,32 +315,41 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                                         <tbody class="bg-white divide-y divide-gray-200">
                                             <?php foreach ($staff_users as $user): ?>
                                                 <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo $user['id']; ?>
-                                                    </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="flex items-center">
                                                             <div class="flex-shrink-0 h-10 w-10">
-                                                                <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                                    <?php echo strtoupper(substr($user['name'], 0, 2)); ?>
-                                                                </div>
+                                                                <?php if (!empty($user['profile_image']) && file_exists("../employees/images/" . $user['profile_image'])): ?>
+                                                                    <img class="h-10 w-10 rounded-full object-cover" src="../employees/images/<?php echo htmlspecialchars($user['profile_image']); ?>" alt="<?php echo htmlspecialchars($user['name']); ?>">
+                                                                <?php else: ?>
+                                                                    <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                                                        <?php echo strtoupper(substr($user['name'], 0, 2)); ?>
+                                                                    </div>
+                                                                <?php endif; ?>
                                                             </div>
                                                             <div class="ml-4">
                                                                 <div class="text-sm font-medium text-gray-900">
-                                                                    <?php echo $user['name']; ?>
+                                                                    <?php echo htmlspecialchars($user['name']); ?>
                                                                 </div>
+                                                                <div class="text-sm text-gray-500">
+                                                                    <?php echo htmlspecialchars($user['username']); ?>
+                                                                </div>
+                                                                <?php if (!empty($user['profession'])): ?>
+                                                                    <div class="text-xs text-gray-400">
+                                                                        <?php echo htmlspecialchars($user['profession']); ?>
+                                                                    </div>
+                                                                <?php endif; ?>
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo $user['username']; ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <?php echo isset($user['email']) ? $user['email'] : 'Ingen email'; ?>
+                                                        <div><?php echo htmlspecialchars($user['email'] ?? 'Ingen email'); ?></div>
+                                                        <?php if (!empty($user['phone'])): ?>
+                                                            <div class="text-xs text-gray-400"><?php echo htmlspecialchars($user['phone']); ?></div>
+                                                        <?php endif; ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $user['role'] === 'Administrator' ? 'bg-primary/10 text-primary' : 'bg-green-100 text-green-800'; ?>">
-                                                            <?php echo $user['role']; ?>
+                                                            <?php echo htmlspecialchars($user['role']); ?>
                                                         </span>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
@@ -284,7 +363,7 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                                             <?php endforeach; ?>
                                             <?php if (count($staff_users) === 0): ?>
                                                 <tr>
-                                                    <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
                                                         Ingen brugere fundet
                                                     </td>
                                                 </tr>
@@ -322,14 +401,79 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Image preview for current user profile
+            const profileImageInput = document.getElementById('profile-image-input');
+            const currentProfilePreview = document.getElementById('current-profile-preview');
+
+            if (profileImageInput && currentProfilePreview) {
+                profileImageInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        // Tjek filtype
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                        if (!allowedTypes.includes(file.type.toLowerCase())) {
+                            alert('Kun JPEG, PNG, GIF og WebP billeder er tilladt');
+                            this.value = '';
+                            return;
+                        }
+
+                        // Tjek filstørrelse (5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                            alert('Billedet må maksimalt være 5MB');
+                            this.value = '';
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            currentProfilePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover">`;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
+            // Image preview for new user
+            const newUserImageInput = document.getElementById('new-user-image-input');
+            const newUserImagePreview = document.getElementById('new-user-image-preview');
+
+            if (newUserImageInput && newUserImagePreview) {
+                newUserImageInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        // Tjek filtype
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+                        if (!allowedTypes.includes(file.type.toLowerCase())) {
+                            alert('Kun JPEG, PNG, GIF og WebP billeder er tilladt');
+                            this.value = '';
+                            return;
+                        }
+
+                        // Tjek filstørrelse (5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                            alert('Billedet må maksimalt være 5MB');
+                            this.value = '';
+                            return;
+                        }
+
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            newUserImagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover">`;
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+
             // Form validation for update profile form
             document.getElementById('update-profile-form').addEventListener('submit', function(e) {
                 const name = document.getElementById('name').value;
                 const username = document.getElementById('username').value;
+                const email = document.getElementById('email').value;
 
-                if (name.trim() === '' || username.trim() === '') {
+                if (name.trim() === '' || username.trim() === '' || email.trim() === '') {
                     e.preventDefault();
-                    showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
+                    showAlert('Fejl', 'Navn, brugernavn og email skal udfyldes', 'error');
                     return false;
                 }
 
@@ -347,7 +491,6 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                     showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
                     return false;
                 }
-
                 if (newPassword !== confirmPassword) {
                     e.preventDefault();
                     showAlert('Fejl', 'De nye adgangskoder matcher ikke', 'error');
@@ -373,13 +516,21 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
 
                     if (newUserName.trim() === '' || newUsername.trim() === '' || newUserPassword.trim() === '' || newUserEmail.trim() === '') {
                         e.preventDefault();
-                        showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
+                        showAlert('Fejl', 'Alle påkrævede felter skal udfyldes', 'error');
                         return false;
                     }
 
                     if (newUserPassword.length < 8) {
                         e.preventDefault();
                         showAlert('Fejl', 'Adgangskoden skal være mindst 8 tegn', 'error');
+                        return false;
+                    }
+
+                    // Validate email format
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(newUserEmail)) {
+                        e.preventDefault();
+                        showAlert('Fejl', 'Indtast en gyldig email-adresse', 'error');
                         return false;
                     }
 
@@ -444,12 +595,12 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
                     (type === 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' : 'bg-red-100 border-l-4 border-red-500 text-red-700');
 
                 alertDiv.innerHTML = `
-                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                    <div>
-                        <h3 class="font-bold">${title}</h3>
-                        <p>${message}</p>
-                    </div>
-                `;
+                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
+                <div>
+                    <h3 class="font-bold">${title}</h3>
+                    <p>${message}</p>
+                </div>
+            `;
 
                 document.body.appendChild(alertDiv);
 
@@ -476,7 +627,7 @@ if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
             const deleteUserMessage = document.getElementById('delete-user-message');
             const deleteUserModal = document.getElementById('delete-user-modal');
             const deleteUserModalContainer = deleteUserModal.querySelector('.bg-white');
-            
+
             deleteUserIdField.value = userId;
             deleteUserMessage.textContent = `Er du sikker på, at du vil slette brugeren ${userName}?`;
 

@@ -80,6 +80,18 @@ if (isset($conn)) {
         $residents[] = $row;
     }
 }
+
+// Hjælpefunktion til at generere profil billede URL
+function getProfileImageUrl($profileImage)
+{
+    if ($profileImage && !empty($profileImage)) {
+        if (!str_starts_with($profileImage, 'http')) {
+            return '/kollegieapp-webadmin' . $profileImage;
+        }
+        return $profileImage;
+    }
+    return null;
+}
 ?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
@@ -175,14 +187,20 @@ if (isset($conn)) {
                             // Vælg en farve baseret på beboer-ID (for konsistens)
                             $colors = ['primary', 'secondary', 'accent'];
                             $color = $colors[$resident['id'] % count($colors)];
+
+                            // Hent profil billede URL
+                            $profileImageUrl = getProfileImageUrl($resident['profile_image']);
                             ?>
                             <!-- Resident Card -->
-                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> overflow-hidden resident-card" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>">
+                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> overflow-hidden resident-card cursor-pointer hover:shadow-lg transition-shadow" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>" data-profile-image="<?php echo $profileImageUrl ? htmlspecialchars($profileImageUrl) : ''; ?>" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
                                 <div class="flex justify-between items-center p-4 border-b border-gray-100">
                                     <div class="flex items-center gap-3">
-                                        <?php if ($resident['profile_image']): ?>
-                                            <div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-                                                <img src="<?php echo htmlspecialchars($resident['profile_image']); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover">
+                                        <?php if ($profileImageUrl): ?>
+                                            <div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-100">
+                                                <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                <div class="w-full h-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-lg font-medium" style="display: none;">
+                                                    <?php echo $initials; ?>
+                                                </div>
                                             </div>
                                         <?php else: ?>
                                             <div class="w-12 h-12 rounded-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-lg font-medium">
@@ -192,24 +210,6 @@ if (isset($conn)) {
                                         <div>
                                             <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?></h3>
                                             <p class="text-sm text-gray-500">Værelse <?php echo htmlspecialchars($resident['room_number']); ?></p>
-                                        </div>
-                                    </div>
-                                    <div class="relative resident-dropdown">
-                                        <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('<?php echo $resident['id']; ?>')">
-                                            <i class="fas fa-ellipsis-v"></i>
-                                        </button>
-                                        <div id="dropdown-<?php echo $resident['id']; ?>" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
-                                            <div class="py-1">
-                                                <a href="edit-resident.php?id=<?php echo $resident['id']; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                                    <i class="fas fa-pencil-alt mr-2"></i> Rediger
-                                                </a>
-                                                <a href="mailto:<?php echo htmlspecialchars($resident['email']); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                                    <i class="fas fa-envelope mr-2"></i> Send besked
-                                                </a>
-                                                <button onclick="event.stopPropagation(); confirmDelete(<?php echo $resident['id']; ?>)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
-                                                    <i class="fas fa-trash mr-2"></i> Slet
-                                                </button>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -233,7 +233,7 @@ if (isset($conn)) {
                                         </div>
                                     </div>
                                     <div class="flex justify-end mt-2">
-                                        <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+                                        <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="event.stopPropagation(); showResidentDetails(<?php echo $resident['id']; ?>)">
                                             Se oplysninger
                                         </button>
                                     </div>
@@ -270,13 +270,19 @@ if (isset($conn)) {
                                     // Vælg en farve baseret på beboer-ID (for konsistens)
                                     $colors = ['primary', 'secondary', 'accent'];
                                     $color = $colors[$resident['id'] % count($colors)];
+
+                                    // Hent profil billede URL
+                                    $profileImageUrl = getProfileImageUrl($resident['profile_image']);
                                     ?>
-                                    <tr class="border-b hover:bg-gray-50 resident-card" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>">
+                                    <tr class="border-b hover:bg-gray-50 resident-card cursor-pointer" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>" data-profile-image="<?php echo $profileImageUrl ? htmlspecialchars($profileImageUrl) : ''; ?>" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
                                         <td class="px-4 py-3">
                                             <div class="flex items-center gap-2">
-                                                <?php if ($resident['profile_image']): ?>
-                                                    <div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden">
-                                                        <img src="<?php echo htmlspecialchars($resident['profile_image']); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover">
+                                                <?php if ($profileImageUrl): ?>
+                                                    <div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
+                                                        <img src="<?php echo htmlspecialchars($profileImageUrl); ?>" alt="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                        <div class="w-full h-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-sm font-medium" style="display: none;">
+                                                            <?php echo $initials; ?>
+                                                        </div>
                                                     </div>
                                                 <?php else: ?>
                                                     <div class="w-8 h-8 rounded-full bg-<?php echo $color; ?> text-white flex items-center justify-center text-sm font-medium">
@@ -292,27 +298,9 @@ if (isset($conn)) {
                                         <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['contact_name'] ?: 'N/A'); ?></td>
                                         <td class="px-4 py-3">
                                             <div class="flex justify-center gap-2">
-                                                <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+                                                <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="event.stopPropagation(); showResidentDetails(<?php echo $resident['id']; ?>)">
                                                     <i class="fas fa-eye"></i>
                                                 </button>
-                                                <div class="relative resident-dropdown">
-                                                    <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('<?php echo $resident['id']; ?>-list')">
-                                                        <i class="fas fa-ellipsis-v"></i>
-                                                    </button>
-                                                    <div id="dropdown-<?php echo $resident['id']; ?>-list" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
-                                                        <div class="py-1">
-                                                            <a href="edit-resident.php?id=<?php echo $resident['id']; ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                                                <i class="fas fa-pencil-alt mr-2"></i> Rediger
-                                                            </a>
-                                                            <a href="mailto:<?php echo htmlspecialchars($resident['email']); ?>" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                                                <i class="fas fa-envelope mr-2"></i> Send besked
-                                                            </a>
-                                                            <button onclick="event.stopPropagation(); confirmDelete(<?php echo $resident['id']; ?>)" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
-                                                                <i class="fas fa-trash mr-2"></i> Slet
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
                                             </div>
                                         </td>
                                     </tr>
@@ -431,24 +419,6 @@ if (isset($conn)) {
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div id="delete-confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-lg w-full max-w-md scale-95 transition-transform duration-300 p-6">
-            <h3 class="text-lg font-bold text-gray-800 mb-4">Bekræft sletning</h3>
-            <p class="text-gray-600 mb-6">Er du sikker på, at du vil slette denne beboer? Denne handling kan ikke fortrydes.</p>
-            <div class="flex justify-end gap-3">
-                <button id="cancel-delete" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
-                    Annuller
-                </button>
-                <form id="delete-form" action="delete-resident.php" method="POST">
-                    <input type="hidden" id="delete-resident-id" name="resident_id" value="">
-                    <button type="submit" class="bg-danger hover:bg-danger/90 text-white px-4 py-2 rounded-lg transition-colors">
-                        Slet beboer
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
     <script>
         // View toggle functionality
         const viewGridBtn = document.getElementById('view-grid');
@@ -498,34 +468,6 @@ if (isset($conn)) {
 
             viewGridBtn.classList.remove('bg-primary', 'text-white');
             viewGridBtn.classList.add('hover:bg-gray-100');
-        });
-
-        // Dropdown menu functionality
-        function toggleDropdown(residentId) {
-            const targetDropdown = document.getElementById(`dropdown-${residentId}`);
-            if (!targetDropdown) return;
-
-            // Luk alle andre dropdowns
-            document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
-                if (dropdown.id !== `dropdown-${residentId}`) {
-                    dropdown.classList.add('hidden');
-                }
-            });
-
-            // Toggle den valgte dropdown
-            targetDropdown.classList.toggle('hidden');
-
-            // Forhindre andre event handlers i at blive udløst
-            event.stopPropagation();
-        }
-
-        // Skjul dropdowns når der klikkes udenfor
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.dropdown-toggle') && !e.target.closest('.dropdown-menu')) {
-                document.querySelectorAll('.dropdown-menu').forEach(dropdown => {
-                    dropdown.classList.add('hidden');
-                });
-            }
         });
 
         // Live søgning
@@ -584,6 +526,7 @@ if (isset($conn)) {
                 const room = card.getAttribute('data-room').toLowerCase();
                 const email = card.getAttribute('data-email').toLowerCase();
                 const phone = card.getAttribute('data-phone').toLowerCase();
+                const profileImage = card.getAttribute('data-profile-image') || '';
 
                 // Tjek om beboeren matcher søgningen
                 const matchesSearch = query === '' ||
@@ -598,11 +541,11 @@ if (isset($conn)) {
                     addedResidentIds.add(cardId);
 
                     // Tilføj til grid visning
-                    const gridItem = createSearchResultGridItem(cardId, name, room, email, phone);
+                    const gridItem = createSearchResultGridItem(cardId, name, room, email, phone, profileImage);
                     resultsGridView.appendChild(gridItem);
 
                     // Tilføj til liste visning
-                    const listItem = createSearchResultListItem(cardId, name, room, email, phone);
+                    const listItem = createSearchResultListItem(cardId, name, room, email, phone, profileImage);
                     resultsTableBody.appendChild(listItem);
                 }
             });
@@ -627,7 +570,7 @@ if (isset($conn)) {
         }
 
         // Opret grid element til søgeresultater
-        function createSearchResultGridItem(id, name, room, email, phone) {
+        function createSearchResultGridItem(id, name, room, email, phone, profileImage) {
             // Generer initialer
             const nameParts = name.split(' ');
             const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
@@ -638,67 +581,60 @@ if (isset($conn)) {
 
             // Opret element
             const div = document.createElement('div');
-            div.className = 'bg-white rounded-xl shadow overflow-hidden resident-card';
+            div.className = 'bg-white rounded-xl shadow overflow-hidden resident-card cursor-pointer hover:shadow-lg transition-shadow';
             div.setAttribute('data-id', id);
+            div.onclick = () => showResidentDetails(id);
+
+            // Profil billede HTML
+            const profileImageHtml = profileImage ?
+                `<div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-100">
+                   <img src="${profileImage}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-lg font-medium" style="display: none;">
+                       ${initials}
+                   </div>
+               </div>` :
+                `<div class="w-12 h-12 rounded-full bg-${color} text-white flex items-center justify-center text-lg font-medium">
+                   ${initials}
+               </div>`;
 
             div.innerHTML = `
-               <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                   <div class="flex items-center gap-3">
-                       <div class="w-12 h-12 rounded-full bg-${color} text-white flex items-center justify-center text-lg font-medium">
-                           ${initials}
-                       </div>
-                       <div>
-                           <h3 class="font-bold text-gray-800">${name}</h3>
-                           <p class="text-sm text-gray-500">Værelse ${room}</p>
-                       </div>
-                   </div>
-                   <div class="relative resident-dropdown">
-                       <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('${id}-search')">
-                           <i class="fas fa-ellipsis-v"></i>
-                       </button>
-                       <div id="dropdown-${id}-search" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
-                           <div class="py-1">
-                               <a href="edit-resident.php?id=${id}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                   <i class="fas fa-pencil-alt mr-2"></i> Rediger
-                               </a>
-                               <a href="mailto:${email}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                   <i class="fas fa-envelope mr-2"></i> Send besked
-                               </a>
-                               <button onclick="event.stopPropagation(); confirmDelete(${id})" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
-                                   <i class="fas fa-trash mr-2"></i> Slet
-                               </button>
-                           </div>
-                       </div>
-                   </div>
-               </div>
-               <div class="p-4">
-                   <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                       <div>
-                           <p class="text-xs text-gray-500">Email</p>
-                           <p class="text-sm truncate">${email}</p>
-                       </div>
-                       <div>
-                           <p class="text-xs text-gray-500">Telefon</p>
-                           <p class="text-sm">${phone}</p>
-                       </div>
-                       <div>
-                           <p class="text-xs text-gray-500">Værelse</p>
-                           <p class="text-sm">${room}</p>
-                       </div>
-                   </div>
-                   <div class="flex justify-end mt-2">
-                       <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="showResidentDetails(${id})">
-                           Se oplysninger
-                       </button>
-                   </div>
-               </div>
-           `;
+              <div class="flex justify-between items-center p-4 border-b border-gray-100">
+                  <div class="flex items-center gap-3">
+                      ${profileImageHtml}
+                      <div>
+                          <h3 class="font-bold text-gray-800">${name}</h3>
+                          <p class="text-sm text-gray-500">Værelse ${room}</p>
+                      </div>
+                  </div>
+              </div>
+              <div class="p-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                      <div>
+                          <p class="text-xs text-gray-500">Email</p>
+                          <p class="text-sm truncate">${email}</p>
+                      </div>
+                      <div>
+                          <p class="text-xs text-gray-500">Telefon</p>
+                          <p class="text-sm">${phone}</p>
+                      </div>
+                      <div>
+                          <p class="text-xs text-gray-500">Værelse</p>
+                          <p class="text-sm">${room}</p>
+                      </div>
+                  </div>
+                  <div class="flex justify-end mt-2">
+                      <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="event.stopPropagation(); showResidentDetails(${id})">
+                          Se oplysninger
+                      </button>
+                  </div>
+              </div>
+          `;
 
             return div;
         }
 
         // Opret liste element til søgeresultater
-        function createSearchResultListItem(id, name, room, email, phone) {
+        function createSearchResultListItem(id, name, room, email, phone, profileImage) {
             // Generer initialer
             const nameParts = name.split(' ');
             const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
@@ -709,47 +645,41 @@ if (isset($conn)) {
 
             // Opret element
             const tr = document.createElement('tr');
-            tr.className = 'border-b hover:bg-gray-50 resident-card';
+            tr.className = 'border-b hover:bg-gray-50 resident-card cursor-pointer';
             tr.setAttribute('data-id', id);
+            tr.onclick = () => showResidentDetails(id);
+
+            // Profil billede HTML
+            const profileImageHtml = profileImage ?
+                `<div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
+                   <img src="${profileImage}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-sm font-medium" style="display: none;">
+                       ${initials}
+                   </div>
+               </div>` :
+                `<div class="w-8 h-8 rounded-full bg-${color} text-white flex items-center justify-center text-sm font-medium">
+                   ${initials}
+               </div>`;
 
             tr.innerHTML = `
-               <td class="px-4 py-3">
-                   <div class="flex items-center gap-2">
-                       <div class="w-8 h-8 rounded-full bg-${color} text-white flex items-center justify-center text-sm font-medium">
-                           ${initials}
-                       </div>
-                       <span class="font-medium">${name}</span>
-                   </div>
-               </td>
-               <td class="px-4 py-3 text-sm">${room}</td>
-               <td class="px-4 py-3 text-sm truncate max-w-[200px]">${email}</td>
-               <td class="px-4 py-3 text-sm">${phone}</td>
-               <td class="px-4 py-3">
-                   <div class="flex justify-center gap-2">
-                       <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="showResidentDetails(${id})">
-                           <i class="fas fa-eye"></i>
-                       </button>
-                       <div class="relative resident-dropdown">
-                           <button class="text-gray-500 hover:text-primary transition-colors p-1 dropdown-toggle" onclick="event.stopPropagation(); toggleDropdown('${id}-list-search')">
-                               <i class="fas fa-ellipsis-v"></i>
-                           </button>
-                           <div id="dropdown-${id}-list-search" class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg hidden z-10 dropdown-menu">
-                               <div class="py-1">
-                                   <a href="edit-resident.php?id=${id}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                       <i class="fas fa-pencil-alt mr-2"></i> Rediger
-                                   </a>
-                                   <a href="mailto:${email}" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors">
-                                       <i class="fas fa-envelope mr-2"></i> Send besked
-                                   </a>
-                                   <button onclick="event.stopPropagation(); confirmDelete(${id})" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-danger transition-colors">
-                                       <i class="fas fa-trash mr-2"></i> Slet
-                                   </button>
-                               </div>
-                           </div>
-                       </div>
-                   </div>
-               </td>
-           `;
+              <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                      ${profileImageHtml}
+                      <span class="font-medium">${name}</span>
+                  </div>
+              </td>
+              <td class="px-4 py-3 text-sm">${room}</td>
+              <td class="px-4 py-3 text-sm truncate max-w-[200px]">${email}</td>
+              <td class="px-4 py-3 text-sm">${phone}</td>
+              <td class="px-4 py-3 text-sm">N/A</td>
+              <td class="px-4 py-3">
+                  <div class="flex justify-center gap-2">
+                      <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="event.stopPropagation(); showResidentDetails(${id})">
+                          <i class="fas fa-eye"></i>
+                      </button>
+                  </div>
+              </td>
+          `;
 
             return tr;
         }
@@ -767,10 +697,10 @@ if (isset($conn)) {
         function showResidentDetails(residentId) {
             // Vis loading indikator
             modalContent.innerHTML = `
-        <div class="flex justify-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-        </div>
-    `;
+       <div class="flex justify-center">
+           <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+       </div>
+   `;
 
             // Vis modal med animation
             modal.classList.remove('hidden');
@@ -801,101 +731,97 @@ if (isset($conn)) {
                         const colors = ['primary', 'secondary', 'accent'];
                         const color = colors[resident.id % colors.length];
 
-                        // Opdater modal indhold
+                        // Generer profil billede URL
+                        const profileImageUrl = resident.profile_image ?
+                            (resident.profile_image.startsWith('http') ? resident.profile_image : `/kollegieapp-webadmin${resident.profile_image}`) : null;
+
+                        // Opdater modal indhold (uden send email og rediger knapper)
                         modalContent.innerHTML = `
-                    <div class="flex flex-col sm:flex-row gap-6">
-                        <div class="sm:w-1/3 flex flex-col items-center">
-                            ${resident.profile_image 
-                                ? `<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
-                                    <img src="${resident.profile_image}" alt="${resident.first_name} ${resident.last_name}" class="w-full h-full object-cover">
-                                  </div>`
-                                : `<div class="w-32 h-32 rounded-full bg-${color} text-white flex items-center justify-center text-4xl font-medium">
-                                    ${initials}
-                                  </div>`
-                            }
-                            <h3 class="text-xl font-bold mt-4 text-center">${resident.first_name} ${resident.last_name}</h3>
-                            <p class="text-gray-500 text-center">${resident.room_number}</p>
-                        </div>
-                        
-                        <div class="sm:w-2/3">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                                <div>
-                                    <h4 class="font-semibold text-gray-700 mb-4">Kontaktoplysninger</h4>
-                                    <div class="space-y-2">
-                                        <div>
-                                            <p class="text-xs text-gray-500">Email</p>
-                                            <p>${resident.email}</p>
-                                        </div>
-                                        <div>
-                                            <p class="text-xs text-gray-500">Telefon</p>
-                                            <p>${resident.phone}</p>
-                                        </div>
-                                        <div class="mt-4">
-                                            <p class="text-xs text-gray-500">Værelse</p>
-                                            <p>${resident.room_number}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div>
-                                    <h4 class="font-semibold text-gray-700 mb-4">Nødkontakt</h4>
-                                    <div class="space-y-2">
-                                        ${resident.contact_name ? `
-                                        <div>
-                                            <p class="text-xs text-gray-500">Navn</p>
-                                            <p>${resident.contact_name}</p>
-                                        </div>` : ''}
-                                        ${resident.contact_phone ? `
-                                        <div>
-                                            <p class="text-xs text-gray-500">Telefon</p>
-                                            <p>${resident.contact_phone}</p>
-                                        </div>` : ''}
-                                        ${!resident.contact_name && !resident.contact_phone ? `
-                                        <p class="text-gray-500">Ingen kontaktperson angivet</p>` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="border-t border-gray-200 pt-4 mt-4 flex justify-end gap-2">
-                        <a href="mailto:${resident.email}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
-                            <i class="fas fa-envelope"></i>
-                            <span>Send email</span>
-                        </a>
-                        <a href="edit-resident.php?id=${resident.id}" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2">
-                            <i class="fas fa-pencil-alt"></i>
-                            <span>Rediger</span>
-                        </a>
-                    </div>
-                `;
+                   <div class="flex flex-col sm:flex-row gap-6">
+                       <div class="sm:w-1/3 flex flex-col items-center">
+                           ${profileImageUrl 
+                               ? `<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
+                                   <img src="${profileImageUrl}" alt="${resident.first_name} ${resident.last_name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-4xl font-medium" style="display: none;">
+                                       ${initials}
+                                   </div>
+                                 </div>`
+                               : `<div class="w-32 h-32 rounded-full bg-${color} text-white flex items-center justify-center text-4xl font-medium">
+                                   ${initials}
+                                 </div>`
+                           }
+                           <h3 class="text-xl font-bold mt-4 text-center">${resident.first_name} ${resident.last_name}</h3>
+                           <p class="text-gray-500 text-center">${resident.room_number}</p>
+                       </div>
+                       
+                       <div class="sm:w-2/3">
+                           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                               <div>
+                                   <h4 class="font-semibold text-gray-700 mb-4">Kontaktoplysninger</h4>
+                                   <div class="space-y-2">
+                                       <div>
+                                           <p class="text-xs text-gray-500">Email</p>
+                                           <p>${resident.email}</p>
+                                       </div>
+                                       <div>
+                                           <p class="text-xs text-gray-500">Telefon</p>
+                                           <p>${resident.phone}</p>
+                                       </div>
+                                       <div class="mt-4">
+                                           <p class="text-xs text-gray-500">Værelse</p>
+                                           <p>${resident.room_number}</p>
+                                       </div>
+                                   </div>
+                               </div>
+                               
+                               <div>
+                                   <h4 class="font-semibold text-gray-700 mb-4">Nødkontakt</h4>
+                                   <div class="space-y-2">
+                                       ${resident.contact_name ? `
+                                       <div>
+                                           <p class="text-xs text-gray-500">Navn</p>
+                                           <p>${resident.contact_name}</p>
+                                       </div>` : ''}
+                                       ${resident.contact_phone ? `
+                                       <div>
+                                           <p class="text-xs text-gray-500">Telefon</p>
+                                           <p>${resident.contact_phone}</p>
+                                       </div>` : ''}
+                                       ${!resident.contact_name && !resident.contact_phone ? `
+                                       <p class="text-gray-500">Ingen kontaktperson angivet</p>` : ''}
+                                   </div>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+               `;
                     } else {
                         // Vis fejlbesked
                         modalContent.innerHTML = `
-                    <div class="bg-red-50 rounded-lg p-4 text-center">
-                        <p class="text-red-500">Der opstod en fejl: ${data.message || 'Kunne ikke hente beboerdata'}</p>
-                    </div>
-                    <div class="flex justify-end mt-4">
-                        <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                            Luk
-                        </button>
-                    </div>
-                `;
+                   <div class="bg-red-50 rounded-lg p-4 text-center">
+                       <p class="text-red-500">Der opstod en fejl: ${data.message || 'Kunne ikke hente beboerdata'}</p>
+                   </div>
+                   <div class="flex justify-end mt-4">
+                       <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                           Luk
+                       </button>
+                   </div>
+               `;
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching resident:', error);
                     modalContent.innerHTML = `
-                <div class="bg-red-50 rounded-lg p-4 text-center">
-                    <p class="text-red-500">Der opstod en fejl ved hentning af beboerdata: ${error.message}</p>
-                    <p class="text-sm text-red-400 mt-2">Kontroller, at filen get-resident-details.php eksisterer og fungerer korrekt.</p>
-                </div>
-                <div class="flex justify-end mt-4">
-                    <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                        Luk
-                    </button>
-                </div>
-            `;
+               <div class="bg-red-50 rounded-lg p-4 text-center">
+                   <p class="text-red-500">Der opstod en fejl ved hentning af beboerdata: ${error.message}</p>
+                   <p class="text-sm text-red-400 mt-2">Kontroller, at filen get-resident-details.php eksisterer og fungerer korrekt.</p>
+               </div>
+               <div class="flex justify-end mt-4">
+                   <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                       Luk
+                   </button>
+               </div>
+           `;
                 });
         }
 
@@ -925,54 +851,6 @@ if (isset($conn)) {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
                 closeModal();
-            }
-        });
-
-        // Delete confirmation
-        const deleteModal = document.getElementById('delete-confirm-modal');
-        const deleteModalContainer = deleteModal.querySelector('.bg-white');
-        const cancelDeleteBtn = document.getElementById('cancel-delete');
-        const deleteResidentIdField = document.getElementById('delete-resident-id');
-
-        function confirmDelete(residentId) {
-            deleteResidentIdField.value = residentId;
-
-            // Vis modal med animation
-            deleteModal.classList.remove('hidden');
-            setTimeout(() => {
-                deleteModal.classList.add('opacity-100');
-                deleteModalContainer.classList.remove('scale-95');
-                deleteModalContainer.classList.add('scale-100');
-            }, 10);
-            document.body.classList.add('overflow-hidden');
-        }
-
-        function closeDeleteModal() {
-            // Skjul modal med animation
-            deleteModal.classList.remove('opacity-100');
-            deleteModalContainer.classList.remove('scale-100');
-            deleteModalContainer.classList.add('scale-95');
-
-            // Vent på at animationen er færdig før vi fjerner modalen helt
-            setTimeout(() => {
-                deleteModal.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            }, 300);
-        }
-
-        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
-
-        // Luk delete modal når der klikkes udenfor
-        deleteModal.addEventListener('click', (e) => {
-            if (e.target === deleteModal) {
-                closeDeleteModal();
-            }
-        });
-
-        // Luk delete modal med Escape-tasten
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !deleteModal.classList.contains('hidden')) {
-                closeDeleteModal();
             }
         });
     </script>

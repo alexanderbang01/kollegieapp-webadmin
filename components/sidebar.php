@@ -97,6 +97,12 @@ if (isset($_SESSION['name'])) {
                 </a>
             </li>
             <li>
+                <a href="<?= $base ?>employees" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'employees' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Ansatte</span>
+                </a>
+            </li>
+            <li>
                 <a href="<?= $base ?>settings/" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'settings' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                     <i class="fas fa-cog"></i>
                     <span>Indstillinger</span>
@@ -171,6 +177,12 @@ if (isset($_SESSION['name'])) {
                     <a href="<?= $base ?>residents" class="flex items-center gap-3 px-4 py-3 <?php echo $page === 'residents' ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                         <i class="fas fa-users"></i>
                         <span>Beboere</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="<?= $base ?>employees" class="flex items-center gap-3 px-4 py-3 <?php echo $page === 'employees' ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
+                        <i class="fas fa-user-tie"></i>
+                        <span>Ansatte</span>
                     </a>
                 </li>
                 <li>

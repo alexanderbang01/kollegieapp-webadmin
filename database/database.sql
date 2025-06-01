@@ -5,20 +5,22 @@ DROP DATABASE IF EXISTS kollegie;
 CREATE DATABASE IF NOT EXISTS kollegie DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_danish_ci;
 USE kollegie;
 
--- Users table for administrators and staff
+-- Users table for administrators and staff (kombineret med employees)
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
+    phone VARCHAR(20) DEFAULT NULL,
     role ENUM('Administrator', 'Personale') NOT NULL DEFAULT 'Personale',
+    profession VARCHAR(255) DEFAULT NULL,
     profile_image VARCHAR(255) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Opdateret residents table (med alle students-tabel felter)
+-- Residents table
 CREATE TABLE residents (
     id INT AUTO_INCREMENT PRIMARY KEY,
     first_name VARCHAR(50) NOT NULL,
@@ -33,7 +35,7 @@ CREATE TABLE residents (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Foodplan table (madplan)
+-- Foodplan table
 CREATE TABLE foodplan (
     id INT AUTO_INCREMENT PRIMARY KEY,
     week_number INT NOT NULL,
@@ -55,13 +57,13 @@ CREATE TABLE foodplan (
     UNIQUE KEY (week_number, year)
 );
 
--- Allergens table (allergener)
+-- Allergens table
 CREATE TABLE allergens (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL UNIQUE
 );
 
--- Foodplan allergens (mange-til-mange relation) - ændret til at inkludere dag
+-- Foodplan allergens
 CREATE TABLE foodplan_allergens (
     foodplan_id INT NOT NULL,
     allergen_id INT NOT NULL,
@@ -86,17 +88,18 @@ CREATE TABLE events (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- Event participants (tilmelding til begivenheder)
+-- Event participants
 CREATE TABLE event_participants (
+    id INT AUTO_INCREMENT PRIMARY KEY,
     event_id INT NOT NULL,
     resident_id INT NOT NULL,
     signup_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (event_id, resident_id),
+    UNIQUE KEY (event_id, resident_id),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
     FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
 );
 
--- News table (nyheder)
+-- News table
 CREATE TABLE news (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
@@ -109,7 +112,7 @@ CREATE TABLE news (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- Ny tabel: News reads (læste nyheder)
+-- News reads
 CREATE TABLE news_reads (
     id INT AUTO_INCREMENT PRIMARY KEY,
     news_id INT NOT NULL,
@@ -120,7 +123,7 @@ CREATE TABLE news_reads (
     UNIQUE KEY (news_id, resident_id)
 );
 
--- Messages table med bedre sikkerhedsstruktur
+-- Messages table
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
@@ -155,36 +158,51 @@ INSERT INTO allergens (name) VALUES
 ('Gluten'), ('Laktose'), ('Nødder'), ('Æg'), ('Soja'), ('Fisk'), ('Skaldyr'), ('Selleri'), ('Sennep');
 
 -- Admin user
-INSERT INTO users (username, password, name, email, role) VALUES 
-('jesp', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Jesper Jensen', 'jesp@mercantec.dk', 'Administrator');
--- Password: password123
+INSERT INTO users (username, password, name, email, phone, role, profession) VALUES 
+('jesp', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Jesper Jensen', 'jesp@mercantec.dk', '+45 12 34 56 78', 'Administrator', 'Administrator');
 
--- Staff user 
-INSERT INTO users (username, password, name, email, role) VALUES 
-('Gitte', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Gitte Ølgod', 'gitø@mercantec.dk', 'Personale');
--- Password: password123
+-- Staff users (alle ansatte kan nu logge ind)
+INSERT INTO users (username, password, name, email, phone, role, profession) VALUES 
+('gitte', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Gitte Ølgod', 'gitte@mercantec.dk', '+45 23 45 67 89', 'Personale', 'Receptionist'),
+('anders', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Anders Nielsen', 'anders@mercantec.dk', '+45 34 56 78 90', 'Personale', 'Pedel'),
+('mette', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Mette Jensen', 'mette@mercantec.dk', '+45 45 67 89 01', 'Personale', 'Rengøringsassistent'),
+('lars', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Lars Pedersen', 'lars@mercantec.dk', '+45 56 78 90 12', 'Personale', 'Kantineleder'),
+('sofie', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Sofie Hansen', 'sofie@mercantec.dk', '+45 67 89 01 23', 'Personale', 'Receptionist'),
+('mikkel', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Mikkel Larsen', 'mikkel@mercantec.dk', '+45 78 90 12 34', 'Personale', 'IT-ansvarlig'),
+('anne', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Anne Sørensen', 'anne@mercantec.dk', '+45 89 01 23 45', 'Personale', 'Køkkenleder'),
+('thomas', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Thomas Andersen', 'thomas@mercantec.dk', '+45 90 12 34 56', 'Personale', 'Viceværtmester'),
+('maria', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Maria Kristensen', 'maria@mercantec.dk', '+45 01 23 45 67', 'Personale', 'Social koordinator'),
+('peter', '$2y$10$auGPeXStY/TCU.26mLO5pupwTIYu4mBhDpz0bEw75wTRsCruaCqrO', 'Peter Madsen', 'peter@mercantec.dk', '+45 12 34 56 78', 'Personale', 'Sikkerhedsansvarlig');
+-- Password for alle: password123
 
--- Sample residents (beboere) - opdateret til kun at bruge de kolonner der findes i tabellen
+-- Sample residents data
 INSERT INTO residents (first_name, last_name, email, phone, room_number, contact_name, contact_phone, profile_image) VALUES
 ('Alexander', 'Jensen', 'alexander@example.com', '+45 12 34 56 78', 'A-204', 'Marie Jensen', '+45 87 65 43 21', NULL),
-('Emma', 'Nielsen', 'emma@example.com', '+45 23 45 67 89', 'B-103', 'Jens Nielsen', '+45 98 76 54 32', NULL);
+('Emma', 'Nielsen', 'emma@example.com', '+45 23 45 67 89', 'B-103', 'Jens Nielsen', '+45 98 76 54 32', NULL),
+('Frederik', 'Hansen', 'frederik@example.com', '+45 34 56 78 90', 'A-105', 'Lars Hansen', '+45 76 54 32 10', NULL),
+('Isabella', 'Larsen', 'isabella@example.com', '+45 45 67 89 01', 'B-207', 'Morten Larsen', '+45 65 43 21 09', NULL),
+('William', 'Andersen', 'william@example.com', '+45 56 78 90 12', 'C-301', 'Susanne Andersen', '+45 54 32 10 98', NULL);
 
--- Sample news
+-- News data
 INSERT INTO news (title, content, is_featured, created_by) VALUES
 ('Velkommen til kollegiet', 'Vi er glade for at byde dig velkommen til vores kollegium. Her finder du information om fællesområder, vaskerum og meget mere.', 1, 1),
 ('Renovering af badeværelser', 'Vi skal renovere badeværelserne på 2. og 3. etage i uge 32. Der vil være midlertidige badefaciliteter i kælderen.', 0, 1),
-('Sommerfest 2025', 'Vi holder sommerfest d. 15. juni 2025 kl. 15:00 i gårdhaven. Alle beboere er velkomne.', 0, 2);
+('Sommerfest 2025', 'Vi holder sommerfest d. 15. juni 2025 kl. 15:00 i gårdhaven. Alle beboere er velkomne.', 0, 2),
+('Ny madplan klar', 'Den nye madplan for næste uge er nu klar. Tjek den ud under madplan-sektionen.', 0, 7),
+('WiFi opdatering', 'Vi opgraderer WiFi netværket i weekenden. Der kan være kortere afbrydelser lørdag morgen.', 0, 6);
 
--- Sample news reads
+-- News reads data
 INSERT INTO news_reads (news_id, resident_id) VALUES
-(1, 1), (1, 2), (2, 1);
+(1, 1), (1, 2), (2, 1), (3, 2), (4, 1);
 
--- Sample events
+-- Events data
 INSERT INTO events (title, description, date, time, location, max_participants, created_by) VALUES
-('Filmaften', 'Vi ser filmen "Dune: Part Two" på storskærm med popcorn og sodavand. Kom og hyg med!', '2025-05-15', '20:00:00', 'Fællesrummet, Stueetagen', 25, 1),
-('Brætspilsaften', 'Tag dit yndlingsbrætspil med og kom til en hyggelig aften med andre beboere.', '2025-05-22', '19:00:00', 'Fællesrummet, Stueetagen', NULL, 2),
-('Fællesspisning', 'Vi laver mad sammen og spiser i fællesrummet. Alle er velkomne.', '2025-05-30', '18:00:00', 'Køkkenet, 1. etage', 20, 1);
+('Filmaften', 'Vi ser filmen "Dune: Part Two" på storskærm med popcorn og sodavand. Kom og hyg med!', '2025-05-30', '20:00:00', 'Fællesrummet, Stueetagen', 25, 1),
+('Brætspilsaften', 'Tag dit yndlingsbrætspil med og kom til en hyggelig aften med andre beboere.', '2025-05-30', '19:00:00', 'Fællesrummet, Stueetagen', NULL, 2),
+('Fællesspisning', 'Vi laver mad sammen og spiser i fællesrummet. Alle er velkomne.', '2025-05-31', '18:00:00', 'Køkkenet, 1. etage', 20, 1),
+('Yoga i haven', 'Kom til gratis yoga session i kollegiets have. Medbring egen måtte.', '2025-06-01', '10:00:00', 'Haven', 15, 9),
+('Gaming turnering', 'FIFA turnering med præmier. Tilmelding på plads.', '2025-06-02', '19:00:00', 'Spillerummet', 16, 6);
 
--- Sample event participants
+-- Event participants data
 INSERT INTO event_participants (event_id, resident_id) VALUES
-(1, 1), (1, 2), (2, 1);
+(1, 1), (1, 2), (1, 3), (2, 1), (2, 4), (3, 2), (3, 5), (4, 1), (4, 3), (5, 2), (5, 4), (5, 5);

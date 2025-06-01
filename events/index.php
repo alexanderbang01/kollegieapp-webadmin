@@ -18,7 +18,7 @@ include '../components/header.php';
 include '../database/db_conn.php';
 
 // Hent den valgte måned og år
-$current_month_index = isset($_GET['month']) ? (int)$_GET['month'] - 1 : date('n') - 1; // 0-baseret indeks
+$current_month_index = isset($_GET['month']) ? (int)$_GET['month'] - 1 : date('n') - 1;
 $current_year = isset($_GET['year']) ? (int)$_GET['year'] : date('Y');
 
 // Sikre gyldigt måneds-indeks
@@ -42,48 +42,61 @@ $danish_days = [
 $sql_month = $current_month_index + 1;
 $sql_month_str = str_pad($sql_month, 2, '0', STR_PAD_LEFT);
 
+// Beregn korrekte start- og slutdatoer for måneden
+$start_date = $current_year . '-' . $sql_month_str . '-01';
+$end_date = date('Y-m-t', strtotime($start_date));
+
 // Hent begivenheder fra databasen
 $events = [];
 if (isset($conn)) {
-    // Hent begivenheder for den valgte måned
-    $start_date = $current_year . '-' . $sql_month_str . '-01';
-    $end_date = $current_year . '-' . $sql_month_str . '-31'; // Simpel tilgang, ikke perfekt for alle måneder
-    
-    $query = "SELECT e.*, u.name AS organizer_name, u.email AS organizer_email,
-                (SELECT COUNT(*) FROM event_participants WHERE event_id = e.id) AS participant_count
-              FROM events e
-              LEFT JOIN users u ON e.created_by = u.id
-              WHERE e.date BETWEEN ? AND ?
-              ORDER BY e.date ASC, e.time ASC";
-              
+    // Simpel query uden JOIN problemer
+    $query = "SELECT * FROM events WHERE date BETWEEN ? AND ? ORDER BY date ASC, time ASC";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("ss", $start_date, $end_date);
     $stmt->execute();
     $result = $stmt->get_result();
     
     while ($row = $result->fetch_assoc()) {
-        $events[] = $row;
-    }
-    
-    // Hent deltagerliste for hver begivenhed
-    foreach ($events as &$event) {
-        $event['attendees'] = [];
+        // Hent organizer info separat
+        $organizer_query = "SELECT name, email FROM users WHERE id = ?";
+        $organizer_stmt = $conn->prepare($organizer_query);
+        $organizer_stmt->bind_param("i", $row['created_by']);
+        $organizer_stmt->execute();
+        $organizer_result = $organizer_stmt->get_result();
+        $organizer = $organizer_result->fetch_assoc();
         
-        $query = "SELECT r.* FROM event_participants ep
-                  JOIN residents r ON ep.resident_id = r.id
-                  WHERE ep.event_id = ?";
-                  
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("i", $event['id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        $row['organizer_name'] = $organizer ? $organizer['name'] : 'Ukendt';
+        $row['organizer_email'] = $organizer ? $organizer['email'] : '';
         
-        while ($row = $result->fetch_assoc()) {
-            $event['attendees'][] = [
-                'name' => $row['first_name'] . ' ' . $row['last_name'],
-                'room' => $row['room_number']
+        // Hent antal deltagere
+        $participant_query = "SELECT COUNT(*) as count FROM event_participants WHERE event_id = ?";
+        $participant_stmt = $conn->prepare($participant_query);
+        $participant_stmt->bind_param("i", $row['id']);
+        $participant_stmt->execute();
+        $participant_result = $participant_stmt->get_result();
+        $participant_data = $participant_result->fetch_assoc();
+        $row['participant_count'] = $participant_data['count'];
+        
+        // Hent deltagerliste
+        $attendee_query = "SELECT r.first_name, r.last_name, r.room_number 
+                          FROM event_participants ep
+                          JOIN residents r ON ep.resident_id = r.id
+                          WHERE ep.event_id = ?
+                          ORDER BY r.first_name, r.last_name";
+        $attendee_stmt = $conn->prepare($attendee_query);
+        $attendee_stmt->bind_param("i", $row['id']);
+        $attendee_stmt->execute();
+        $attendee_result = $attendee_stmt->get_result();
+        
+        $row['attendees'] = [];
+        while ($attendee = $attendee_result->fetch_assoc()) {
+            $row['attendees'][] = [
+                'name' => $attendee['first_name'] . ' ' . $attendee['last_name'],
+                'room' => $attendee['room_number']
             ];
         }
+        
+        $events[] = $row;
     }
 }
 ?>
@@ -135,7 +148,6 @@ if (isset($conn)) {
                         </div>
                     </div>
                     <script>
-                        // Skjul besked efter 3 sekunder
                         setTimeout(function() {
                             const statusMessage = document.getElementById('status-message');
                             if (statusMessage) {
@@ -165,7 +177,7 @@ if (isset($conn)) {
 
                         <!-- Center: Search field -->
                         <div class="relative sm:w-1/3 w-full">
-                            <input type="text" placeholder="Søg i begivenheder..." class="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            <input type="text" id="search-events" placeholder="Søg i begivenheder..." class="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50">
                             <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         </div>
 
@@ -195,8 +207,8 @@ if (isset($conn)) {
                         </div>
                     <?php else: ?>
                         <?php foreach ($events as $index => $event): ?>
-                            <!-- Event -->
-                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?>">
+                            <!-- Event Card for: <?php echo htmlspecialchars($event['title']) . ' (ID: ' . $event['id'] . ')'; ?> -->
+                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> event-card" data-event-id="<?php echo $event['id']; ?>">
                                 <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
                                     <div class="flex items-center gap-3">
                                         <div class="bg-primary/10 text-primary p-2 rounded-lg">
@@ -248,6 +260,7 @@ if (isset($conn)) {
                     <?php endif; ?>
                 </div>
 
+                <!-- Modals forbliver de samme som før -->
                 <!-- Event Details Modal -->
                 <div id="event-details-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
                     <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto scale-95 transition-transform duration-300">
@@ -291,12 +304,13 @@ if (isset($conn)) {
     </div>
 
     <script>
+        // JavaScript forbliver det samme som før
         // Month navigation
         const prevMonthBtn = document.getElementById('prev-month');
         const nextMonthBtn = document.getElementById('next-month');
 
         const months = ['Januar', 'Februar', 'Marts', 'April', 'Maj', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'December'];
-        let currentMonthIndex = <?php echo $current_month_index; ?>; // 0-baseret indeks
+        let currentMonthIndex = <?php echo $current_month_index; ?>;
         let currentYear = <?php echo $current_year; ?>;
         const monthTitle = document.querySelector('h2');
 
@@ -324,7 +338,27 @@ if (isset($conn)) {
             monthTitle.textContent = `${months[currentMonthIndex]} ${currentYear}`;
         }
 
-        // Layout-skift funktionalitet
+        // Search functionality
+        const searchInput = document.getElementById('search-events');
+        const eventCards = document.querySelectorAll('.event-card');
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            eventCards.forEach(card => {
+                const title = card.querySelector('h3').textContent.toLowerCase();
+                const description = card.querySelector('p').textContent.toLowerCase();
+                const location = card.querySelector('.fa-map-marker-alt').parentNode.textContent.toLowerCase();
+                
+                if (title.includes(searchTerm) || description.includes(searchTerm) || location.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+
+        // Layout controls
         const layout1Btn = document.getElementById('layout-1');
         const layout2Btn = document.getElementById('layout-2');
         const layout3Btn = document.getElementById('layout-3');
@@ -346,12 +380,9 @@ if (isset($conn)) {
         });
 
         function setActiveLayout(button) {
-            // Fjern aktiv klasse fra alle knapper
             [layout1Btn, layout2Btn, layout3Btn].forEach(btn => {
                 btn.className = 'w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100';
             });
-
-            // Tilføj aktiv klasse til den valgte knap
             button.className = 'w-8 h-8 flex items-center justify-center rounded bg-primary text-white';
         }
 
@@ -362,25 +393,20 @@ if (isset($conn)) {
         const modalTitle = document.getElementById('modal-title');
         const modalContent = document.getElementById('modal-content');
 
-        // Konverter begivenheder til JavaScript objekt
         const eventData = <?php echo json_encode($events); ?>;
 
         function showEventDetails(eventId) {
-            // Find begivenheden ud fra ID
             const event = eventData.find(event => event.id == eventId);
             if (!event) return;
 
-            // Konverter dato til dansk format
             const eventDate = new Date(event.date);
             const weekday = ['Søndag', 'Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag'][eventDate.getDay()];
             const day = eventDate.getDate();
             const month = months[eventDate.getMonth()].toLowerCase();
             const formattedDate = `${weekday}, ${day}. ${month}`;
 
-            // Opdater modal titel
             modalTitle.textContent = event.title;
 
-            // Opdater modal indhold
             modalContent.innerHTML = `
                 <div class="space-y-6">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -459,9 +485,7 @@ if (isset($conn)) {
                 </div>
             `;
 
-            // Vis modal med animation
             modal.classList.remove('hidden');
-            // Kort timeout for at sikre at transitioner virker korrekt efter at elementet er vist
             setTimeout(() => {
                 modal.classList.add('opacity-100');
                 modalContainer.classList.remove('scale-95');
@@ -471,12 +495,10 @@ if (isset($conn)) {
         }
 
         function closeModal() {
-            // Skjul modal med animation
             modal.classList.remove('opacity-100');
             modalContainer.classList.remove('scale-100');
             modalContainer.classList.add('scale-95');
 
-            // Vent på at animationen er færdig før vi fjerner modalen helt
             setTimeout(() => {
                 modal.classList.add('hidden');
                 document.body.classList.remove('overflow-hidden');
@@ -485,14 +507,12 @@ if (isset($conn)) {
 
         closeModalBtn.addEventListener('click', closeModal);
 
-        // Luk modal når der klikkes udenfor
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 closeModal();
             }
         });
 
-        // Luk modal med Escape-tasten
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
                 closeModal();
@@ -508,7 +528,6 @@ if (isset($conn)) {
         function confirmDelete(eventId) {
             deleteEventIdField.value = eventId;
             
-            // Vis modal med animation
             deleteModal.classList.remove('hidden');
             setTimeout(() => {
                 deleteModal.classList.add('opacity-100');
@@ -519,12 +538,10 @@ if (isset($conn)) {
         }
 
         function closeDeleteModal() {
-            // Skjul modal med animation
             deleteModal.classList.remove('opacity-100');
             deleteModalContainer.classList.remove('scale-100');
             deleteModalContainer.classList.add('scale-95');
 
-            // Vent på at animationen er færdig før vi fjerner modalen helt
             setTimeout(() => {
                 deleteModal.classList.add('hidden');
                 document.body.classList.remove('overflow-hidden');
@@ -533,14 +550,12 @@ if (isset($conn)) {
 
         cancelDeleteBtn.addEventListener('click', closeDeleteModal);
 
-        // Luk delete modal når der klikkes udenfor
         deleteModal.addEventListener('click', (e) => {
             if (e.target === deleteModal) {
                 closeDeleteModal();
             }
         });
 
-        // Luk delete modal med Escape-tasten
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !deleteModal.classList.contains('hidden')) {
                 closeDeleteModal();
