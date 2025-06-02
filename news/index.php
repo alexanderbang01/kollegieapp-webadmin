@@ -1,5 +1,5 @@
 <?php
-$page = "settings";
+$page = "news";
 
 // Start session
 if (session_status() == PHP_SESSION_NONE) {
@@ -14,28 +14,52 @@ if (!isset($_SESSION['user_id'])) {
 include '../components/header.php';
 include '../database/db_conn.php';
 
-// Hent brugerdata fra databasen hvis brugeren er administrator
-$staff_users = [];
-if ($_SESSION['role'] === 'Administrator' && isset($conn)) {
-    $stmt = $conn->prepare("SELECT id, username, name, email, phone, role, profession, profile_image FROM users ORDER BY role DESC, name ASC");
+// Hent nyheder fra databasen
+$news = [];
+$featuredNews = null;
+
+if (isset($conn)) {
+    // Hent fremhævede nyheder
+    $featured_query = "SELECT n.*, u.name AS author_name, u.username,
+                      (SELECT COUNT(*) FROM news_reads WHERE news_id = n.id) AS read_count
+                      FROM news n
+                      LEFT JOIN users u ON n.created_by = u.id
+                      WHERE n.is_featured = 1
+                      ORDER BY n.published_at DESC
+                      LIMIT 1";
+
+    $featured_result = $conn->query($featured_query);
+    if ($featured_result && $featured_result->num_rows > 0) {
+        $featuredNews = $featured_result->fetch_assoc();
+    }
+
+    // Hent almindelige nyheder (ikke fremhævede)
+    $page_number = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+    $items_per_page = 4;
+    $offset = ($page_number - 1) * $items_per_page;
+
+    $news_query = "SELECT n.*, u.name AS author_name, u.username,
+                  (SELECT COUNT(*) FROM news_reads WHERE news_id = n.id) AS read_count
+                  FROM news n
+                  LEFT JOIN users u ON n.created_by = u.id
+                  WHERE n.is_featured = 0
+                  ORDER BY n.published_at DESC
+                  LIMIT ?, ?";
+
+    $stmt = $conn->prepare($news_query);
+    $stmt->bind_param("ii", $offset, $items_per_page);
     $stmt->execute();
     $result = $stmt->get_result();
 
     while ($row = $result->fetch_assoc()) {
-        $staff_users[] = $row;
+        $news[] = $row;
     }
-}
 
-// Hent den nuværende brugers fulde profil
-$current_user = [];
-if (isset($conn)) {
-    $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
-    $stmt->bind_param("i", $_SESSION['user_id']);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    if ($result->num_rows > 0) {
-        $current_user = $result->fetch_assoc();
-    }
+    // Hent samlet antal nyheder til pagination
+    $count_query = "SELECT COUNT(*) as total FROM news WHERE is_featured = 0";
+    $count_result = $conn->query($count_query);
+    $total_news = $count_result->fetch_assoc()['total'];
+    $total_pages = ceil($total_news / $items_per_page);
 }
 ?>
 
@@ -45,13 +69,17 @@ if (isset($conn)) {
 
         <!-- Main content -->
         <main class="flex-grow">
-            <!-- Settings content -->
+            <!-- News content -->
             <div class="p-3 sm:p-6">
                 <div class="mb-4 sm:mb-6 flex justify-between items-center">
                     <div>
-                        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Indstillinger</h1>
-                        <p class="text-sm sm:text-base text-gray-600">Administrer din konto og brugerindstillinger</p>
+                        <h1 class="text-xl sm:text-2xl font-bold text-gray-800">Nyheder</h1>
+                        <p class="text-sm sm:text-base text-gray-600">Administrer kollegiets nyheder og meddelelser</p>
                     </div>
+                    <a href="create-news.php" class="bg-primary hover:bg-primary/90 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base transition-colors flex items-center gap-2">
+                        <i class="fas fa-plus"></i>
+                        <span>Opret nyhed</span>
+                    </a>
                 </div>
 
                 <!-- Status message -->
@@ -96,303 +124,237 @@ if (isset($conn)) {
                     </script>
                 <?php endif; ?>
 
-                <!-- Main settings area med side-by-side layout -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <!-- Personlig profil -->
-                    <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
-                        <div class="border-b border-gray-200 px-4 py-3">
-                            <h2 class="font-bold text-lg text-gray-800">Personlig profil</h2>
+                <!-- Search and filter -->
+                <div class="bg-white rounded-xl shadow p-4 sm:p-6 mb-4 sm:mb-6 animate-fade-in">
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <!-- Search field -->
+                        <div class="relative sm:w-1/3 w-full">
+                            <input type="text" id="search-input" placeholder="Søg i nyheder..." class="w-full border border-gray-300 rounded-lg px-3 py-2 pl-9 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
                         </div>
 
-                        <div class="p-4 sm:p-6">
-                            <form id="update-profile-form" action="update-profile.php" method="POST" enctype="multipart/form-data">
-                                <div class="space-y-4">
-                                    <!-- Profilbillede -->
-                                    <div class="flex flex-col items-center mb-6">
-                                        <div class="relative">
-                                            <div id="current-profile-preview" class="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center">
-                                                <?php if (!empty($current_user['profile_image']) && file_exists("../employees/images/" . $current_user['profile_image'])): ?>
-                                                    <img src="../employees/images/<?php echo htmlspecialchars($current_user['profile_image']); ?>" alt="Profilbillede" class="w-full h-full object-cover">
-                                                <?php else: ?>
-                                                    <?php
-                                                    $name_parts = explode(' ', $current_user['name'] ?? '');
-                                                    $initials = strtoupper(substr($name_parts[0], 0, 1) . (isset($name_parts[1]) ? substr($name_parts[1], 0, 1) : ''));
-                                                    ?>
-                                                    <span class="text-2xl font-bold text-gray-500"><?php echo $initials; ?></span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <label for="profile-image-input" class="absolute bottom-0 right-0 bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
-                                                <i class="fas fa-camera text-sm"></i>
-                                            </label>
-                                        </div>
-                                        <input type="file" id="profile-image-input" name="profile_image" accept="image/*" class="hidden">
-                                        <p class="text-xs text-gray-500 mt-2 text-center">Klik på kamera-ikonet for at ændre billede</p>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Bruger ID</label>
-                                        <input type="text" value="<?php echo $_SESSION['user_id']; ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
-                                    </div>
-
-                                    <div>
-                                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
-                                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($current_user['name'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
-                                        <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($current_user['username'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($current_user['email'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
-                                        <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($current_user['phone'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label for="profession" class="block text-sm font-medium text-gray-700 mb-1">Profession</label>
-                                        <input type="text" id="profession" name="profession" value="<?php echo htmlspecialchars($current_user['profession'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
-                                        <input type="text" value="<?php echo ucfirst($current_user['role'] ?? ''); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
-                                    </div>
-
-                                    <div class="pt-2">
-                                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                            Gem ændringer
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <!-- Skift adgangskode -->
-                    <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
-                        <div class="border-b border-gray-200 px-4 py-3">
-                            <h2 class="font-bold text-lg text-gray-800">Skift adgangskode</h2>
-                        </div>
-
-                        <div class="p-4 sm:p-6 space-y-4">
-                            <form id="change-password-form" action="change-password.php" method="POST">
-                                <div class="space-y-4">
-                                    <div>
-                                        <label for="current-password" class="block text-sm font-medium text-gray-700 mb-1">Nuværende adgangskode</label>
-                                        <input type="password" id="current-password" name="current_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div>
-                                        <label for="new-password" class="block text-sm font-medium text-gray-700 mb-1">Ny adgangskode</label>
-                                        <input type="password" id="new-password" name="new_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        <p class="text-xs text-gray-500 mt-1">Mindst 8 tegn</p>
-                                    </div>
-
-                                    <div>
-                                        <label for="confirm-password" class="block text-sm font-medium text-gray-700 mb-1">Bekræft adgangskode</label>
-                                        <input type="password" id="confirm-password" name="confirm_password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                    </div>
-
-                                    <div class="pt-2">
-                                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                            Opdater adgangskode
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
+                        <!-- Layout controls -->
+                        <div class="flex justify-end">
+                            <div class="bg-white rounded-lg shadow p-2 flex gap-2">
+                                <button id="layout-1" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100" title="1 nyhed pr. række">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                                <button id="layout-2" class="w-8 h-8 flex items-center justify-center rounded bg-primary text-white" title="2 nyheder pr. række">
+                                    <i class="fas fa-th-large"></i>
+                                </button>
+                                <button id="layout-3" class="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100" title="Kompakt visning">
+                                    <i class="fas fa-th"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Administratorsektion - vises kun for administratorer -->
-                <?php if ($_SESSION['role'] === 'Administrator'): ?>
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <!-- Tilføj bruger -->
-                        <div class="bg-white rounded-xl shadow overflow-hidden h-fit">
-                            <div class="border-b border-gray-200 px-4 py-3">
-                                <h2 class="font-bold text-lg text-gray-800">Tilføj bruger</h2>
-                                <p class="text-sm text-gray-600 mt-1">Kun administratorer kan tilføje nye brugere til systemet</p>
-                            </div>
+                <!-- Search results -->
+                <div id="search-results" class="hidden mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="text-lg font-bold">Søgeresultater</h2>
+                        <button id="clear-search" class="text-primary hover:text-primary/80 text-sm flex items-center gap-1">
+                            <i class="fas fa-times"></i>
+                            <span>Ryd søgning</span>
+                        </button>
+                    </div>
+                    <div id="results-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Search results will be loaded here dynamically -->
+                    </div>
+                </div>
 
-                            <div class="p-4 sm:p-6 space-y-4">
-                                <form id="add-user-form" action="add-user.php" method="POST" enctype="multipart/form-data">
-                                    <div class="space-y-4">
-                                        <!-- Profilbillede upload -->
-                                        <div class="flex flex-col items-center mb-4">
-                                            <div class="relative">
-                                                <div id="new-user-image-preview" class="w-20 h-20 rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center">
-                                                    <i class="fas fa-user text-2xl text-gray-400"></i>
-                                                </div>
-                                                <label for="new-user-image-input" class="absolute bottom-0 right-0 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
-                                                    <i class="fas fa-camera text-xs"></i>
-                                                </label>
+                <!-- Featured news -->
+                <div id="regular-content">
+                    <?php if ($featuredNews): ?>
+                        <div class="mb-6">
+                            <h2 class="text-lg font-bold mb-3">Fremhævede nyheder</h2>
+                            <div class="bg-white rounded-xl shadow overflow-hidden animate-fade-in">
+                                <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
+                                    <div class="flex items-center gap-3">
+                                        <div class="bg-<?php echo $featuredNews['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo $featuredNews['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
+                                            <i class="fas fa-<?php echo $featuredNews['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
+                                        </div>
+                                        <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($featuredNews['title']); ?></h3>
+                                    </div>
+                                    <div class="flex gap-2">
+                                        <a href="edit-news.php?id=<?php echo $featuredNews['id']; ?>" class="text-gray-400 hover:text-primary transition-colors" title="Rediger">
+                                            <i class="fas fa-pencil-alt"></i>
+                                        </a>
+                                        <button class="text-gray-400 hover:text-danger transition-colors" onclick="confirmDelete(<?php echo $featuredNews['id']; ?>)" title="Slet">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="text-primary hover:text-primary/90 transition-colors text-xl" onclick="toggleFeatured(<?php echo $featuredNews['id']; ?>, 0)" title="Fjern fremhævning">
+                                            <i class="fas fa-thumbtack"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-4">
+                                    <div class="flex justify-between mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
+                                                <span class="font-medium text-xs"><?php echo strtoupper(substr($featuredNews['username'], 0, 2)); ?></span>
                                             </div>
-                                            <input type="file" id="new-user-image-input" name="profile_image" accept="image/*" class="hidden">
-                                            <p class="text-xs text-gray-500 mt-1 text-center">Valgfrit profilbillede</p>
+                                            <span class="font-medium"><?php echo htmlspecialchars($featuredNews['author_name']); ?></span>
                                         </div>
-
-                                        <div>
-                                            <label for="new-user-name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn <span class="text-red-500">*</span></label>
-                                            <input type="text" id="new-user-name" name="name" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        </div>
-
-                                        <div>
-                                            <label for="new-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
-                                            <input type="email" id="new-user-email" name="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        </div>
-
-                                        <div>
-                                            <label for="new-username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn <span class="text-red-500">*</span></label>
-                                            <input type="text" id="new-username" name="username" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        </div>
-
-                                        <div>
-                                            <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Adgangskode <span class="text-red-500">*</span></label>
-                                            <input type="password" id="new-user-password" name="password" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                            <p class="text-xs text-gray-500 mt-1">Mindst 8 tegn</p>
-                                        </div>
-
-                                        <div>
-                                            <label for="new-user-phone" class="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
-                                            <input type="tel" id="new-user-phone" name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        </div>
-
-                                        <div>
-                                            <label for="new-user-profession" class="block text-sm font-medium text-gray-700 mb-1">Profession</label>
-                                            <input type="text" id="new-user-profession" name="profession" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                        </div>
-
-                                        <div>
-                                            <label for="new-user-role" class="block text-sm font-medium text-gray-700 mb-1">Rolle <span class="text-red-500">*</span></label>
-                                            <select id="new-user-role" name="role" required class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
-                                                <option value="Personale">Personale</option>
-                                                <option value="Administrator">Administrator</option>
-                                            </select>
-                                            <p class="text-xs text-gray-500 mt-1">Administratorer kan tilføje andre brugere, personale kan ikke</p>
-                                        </div>
-
-                                        <div class="pt-2">
-                                            <button type="submit" class="w-full bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors">
-                                                <i class="fas fa-plus mr-1"></i> Tilføj bruger
-                                            </button>
+                                        <div class="text-gray-500 text-sm">
+                                            <?php
+                                            $date = new DateTime($featuredNews['published_at']);
+                                            echo $date->format('j. F Y · H:i');
+                                            ?>
                                         </div>
                                     </div>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Personaleliste - spænder over 2 kolonner -->
-                        <div class="lg:col-span-2 bg-white rounded-xl shadow overflow-hidden">
-                            <div class="border-b border-gray-200 px-4 py-3">
-                                <h2 class="font-bold text-lg text-gray-800">Personaleliste</h2>
-                            </div>
-
-                            <div class="p-4 sm:p-6">
-                                <div class="overflow-x-auto rounded-lg border border-gray-200 max-h-[800px] overflow-y-auto">
-                                    <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50 sticky top-0">
-                                            <tr>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Bruger
-                                                </th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Kontakt
-                                                </th>
-                                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Rolle
-                                                </th>
-                                                <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                    Handling
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white divide-y divide-gray-200">
-                                            <?php foreach ($staff_users as $user): ?>
-                                                <tr>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <div class="flex items-center">
-                                                            <div class="flex-shrink-0 h-10 w-10">
-                                                                <?php if (!empty($user['profile_image']) && file_exists("../employees/images/" . $user['profile_image'])): ?>
-                                                                    <img class="h-10 w-10 rounded-full object-cover" src="../employees/images/<?php echo htmlspecialchars($user['profile_image']); ?>" alt="<?php echo htmlspecialchars($user['name']); ?>">
-                                                                <?php else: ?>
-                                                                    <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                                        <?php echo strtoupper(substr($user['name'], 0, 2)); ?>
-                                                                    </div>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                            <div class="ml-4">
-                                                                <div class="text-sm font-medium text-gray-900">
-                                                                    <?php echo htmlspecialchars($user['name']); ?>
-                                                                </div>
-                                                                <div class="text-sm text-gray-500">
-                                                                    <?php echo htmlspecialchars($user['username']); ?>
-                                                                </div>
-                                                                <?php if (!empty($user['profession'])): ?>
-                                                                    <div class="text-xs text-gray-400">
-                                                                        <?php echo htmlspecialchars($user['profession']); ?>
-                                                                    </div>
-                                                                <?php endif; ?>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <div><?php echo htmlspecialchars($user['email'] ?? 'Ingen email'); ?></div>
-                                                        <?php if (!empty($user['phone'])): ?>
-                                                            <div class="text-xs text-gray-400"><?php echo htmlspecialchars($user['phone']); ?></div>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap">
-                                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $user['role'] === 'Administrator' ? 'bg-primary/10 text-primary' : 'bg-green-100 text-green-800'; ?>">
-                                                            <?php echo htmlspecialchars($user['role']); ?>
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                                                        <?php if ($user['id'] !== $_SESSION['user_id']): ?>
-                                                            <button onclick="confirmDeleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name']); ?>')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                            <?php if (count($staff_users) === 0): ?>
-                                                <tr>
-                                                    <td colspan="4" class="px-6 py-4 text-center text-sm text-gray-500">
-                                                        Ingen brugere fundet
-                                                    </td>
-                                                </tr>
+                                    <p class="text-gray-700 mb-4"><?php echo nl2br(htmlspecialchars($featuredNews['content'])); ?></p>
+                                    <div class="flex justify-between items-center">
+                                        <div>
+                                            <?php if ($featuredNews['is_important']): ?>
+                                                <span class="px-2 py-1 bg-danger/10 text-danger text-xs rounded-full">Vigtig</span>
                                             <?php endif; ?>
-                                        </tbody>
-                                    </table>
+                                        </div>
+                                        <div class="flex items-center gap-1 text-gray-500 text-sm cursor-pointer hover:text-primary transition-colors" onclick="showReaders(<?php echo $featuredNews['id']; ?>)">
+                                            <i class="far fa-eye"></i>
+                                            <span><?php echo $featuredNews['read_count']; ?></span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+                    <?php endif; ?>
+
+                    <!-- News list -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6" id="news-grid">
+                        <?php if (empty($news)): ?>
+                            <div class="col-span-2 bg-white rounded-xl shadow p-6 text-center">
+                                <p class="text-gray-500">Ingen nyheder fundet.</p>
+                                <a href="create-news.php" class="mt-2 inline-block text-primary hover:underline">Opret en ny nyhed</a>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach ($news as $index => $item): ?>
+                                <!-- News item -->
+                                <div class="bg-white rounded-xl shadow overflow-hidden animate-fade-in delay-<?php echo ($index % 4) * 100; ?> news-item"
+                                    data-title="<?php echo htmlspecialchars($item['title']); ?>"
+                                    data-content="<?php echo htmlspecialchars($item['content']); ?>"
+                                    data-featured="<?php echo $item['is_featured']; ?>"
+                                    data-id="<?php echo $item['id']; ?>">
+                                    <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
+                                        <div class="flex items-center gap-3">
+                                            <div class="bg-<?php echo $item['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo $item['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
+                                                <i class="fas fa-<?php echo $item['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
+                                            </div>
+                                            <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($item['title']); ?></h3>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <a href="edit-news.php?id=<?php echo $item['id']; ?>" class="text-gray-400 hover:text-primary transition-colors" title="Rediger">
+                                                <i class="fas fa-pencil-alt"></i>
+                                            </a>
+                                            <button class="text-gray-400 hover:text-danger transition-colors" onclick="confirmDelete(<?php echo $item['id']; ?>)" title="Slet">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            <button class="text-gray-400 hover:text-primary transition-colors text-xl" onclick="toggleFeatured(<?php echo $item['id']; ?>, 1)" title="Fremhæv denne nyhed">
+                                                <i class="fa fa-thumbtack"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="p-4">
+                                        <div class="flex justify-between mb-3">
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
+                                                    <span class="font-medium text-xs"><?php echo strtoupper(substr($item['username'], 0, 2)); ?></span>
+                                                </div>
+                                                <span class="font-medium"><?php echo htmlspecialchars($item['author_name']); ?></span>
+                                            </div>
+                                            <div class="text-gray-500 text-sm">
+                                                <?php
+                                                $date = new DateTime($item['published_at']);
+                                                echo $date->format('j. F Y · H:i');
+                                                ?>
+                                            </div>
+                                        </div>
+                                        <p class="text-gray-700 mb-4 news-content">
+                                            <?php
+                                            // Vis en forkortet version af indholdet
+                                            $content = htmlspecialchars($item['content']);
+                                            echo strlen($content) > 200 ? nl2br(substr($content, 0, 200)) . '...' : nl2br($content);
+                                            ?>
+                                        </p>
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <?php if ($item['is_important']): ?>
+                                                    <span class="px-2 py-1 bg-danger/10 text-danger text-xs rounded-full">Vigtig</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="flex items-center gap-1 text-gray-500 text-sm cursor-pointer hover:text-primary transition-colors" onclick="showReaders(<?php echo $item['id']; ?>)">
+                                                <i class="far fa-eye"></i>
+                                                <span><?php echo $item['read_count']; ?></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
-                <?php endif; ?>
+
+                    <!-- Pagination -->
+                    <?php if (!empty($news) && $total_pages > 1): ?>
+                        <div class="flex justify-between items-center">
+                            <div class="text-gray-500 text-sm">
+                                Viser <?php echo $offset + 1; ?>-<?php echo min($offset + count($news), $total_news); ?> af <?php echo $total_news; ?> nyheder
+                            </div>
+                            <div class="flex gap-1">
+                                <a href="?page=<?php echo max(1, $page_number - 1); ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number > 1 ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+
+                                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                                    <a href="?page=<?php echo $i; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $i == $page_number ? 'bg-primary text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors'; ?>">
+                                        <?php echo $i; ?>
+                                    </a>
+                                <?php endfor; ?>
+
+                                <a href="?page=<?php echo min($total_pages, $page_number + 1); ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number < $total_pages ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </main>
     </div>
 
-    <!-- Delete User Confirmation Modal -->
-    <div id="delete-user-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+    <!-- Readers Modal -->
+    <div id="readers-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto scale-95 transition-transform duration-300">
+            <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-primary/10 text-primary p-2 rounded-lg">
+                        <i class="far fa-eye text-lg"></i>
+                    </div>
+                    <h3 class="font-bold text-gray-800 text-xl" id="modal-title">Læst af</h3>
+                </div>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-4" id="modal-content">
+                <!-- Readers list will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white rounded-xl shadow-lg w-full max-w-md scale-95 transition-transform duration-300 p-6">
             <h3 class="text-lg font-bold text-gray-800 mb-4">Bekræft sletning</h3>
-            <p class="text-gray-600 mb-2" id="delete-user-message">Er du sikker på, at du vil slette denne bruger?</p>
-            <p class="text-gray-500 text-sm mb-6">Denne handling kan ikke fortrydes.</p>
+            <p class="text-gray-600 mb-6">Er du sikker på, at du vil slette denne nyhed? Denne handling kan ikke fortrydes.</p>
             <div class="flex justify-end gap-3">
-                <button id="cancel-delete-user" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
+                <button id="cancel-delete" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors">
                     Annuller
                 </button>
-                <form id="delete-user-form" action="delete-user.php" method="POST">
-                    <input type="hidden" id="delete-user-id" name="user_id" value="">
-                    <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors">
-                        Slet bruger
+                <form id="delete-form" action="delete-news.php" method="POST">
+                    <input type="hidden" id="delete-news-id" name="news_id" value="">
+                    <button type="submit" class="bg-danger hover:bg-danger/90 text-white px-4 py-2 rounded-lg transition-colors">
+                        Slet nyhed
                     </button>
                 </form>
             </div>
@@ -400,246 +362,361 @@ if (isset($conn)) {
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Image preview for current user profile
-            const profileImageInput = document.getElementById('profile-image-input');
-            const currentProfilePreview = document.getElementById('current-profile-preview');
+        // Layout-skift funktionalitet
+        const layout1Btn = document.getElementById('layout-1');
+        const layout2Btn = document.getElementById('layout-2');
+        const layout3Btn = document.getElementById('layout-3');
+        const newsGrid = document.getElementById('news-grid');
 
-            if (profileImageInput && currentProfilePreview) {
-                profileImageInput.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        // Tjek filtype
-                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                        if (!allowedTypes.includes(file.type.toLowerCase())) {
-                            alert('Kun JPEG, PNG, GIF og WebP billeder er tilladt');
-                            this.value = '';
-                            return;
+        layout1Btn.addEventListener('click', () => {
+            newsGrid.className = 'grid grid-cols-1 gap-4 mb-6';
+            setActiveLayout(layout1Btn);
+        });
+
+        layout2Btn.addEventListener('click', () => {
+            newsGrid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6';
+            setActiveLayout(layout2Btn);
+        });
+
+        layout3Btn.addEventListener('click', () => {
+            newsGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6';
+            setActiveLayout(layout3Btn);
+        });
+
+        function setActiveLayout(button) {
+            // Fjern aktiv klasse fra alle knapper
+            [layout1Btn, layout2Btn, layout3Btn].forEach(btn => {
+                btn.className = 'w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100';
+            });
+
+            // Tilføj aktiv klasse til den valgte knap
+            button.className = 'w-8 h-8 flex items-center justify-center rounded bg-primary text-white';
+        }
+
+        // Live søgefunktion
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        const resultsContainer = document.getElementById('results-container');
+        const regularContent = document.getElementById('regular-content');
+        const clearSearchBtn = document.getElementById('clear-search');
+        const newsItems = document.querySelectorAll('.news-item');
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+
+            if (query.length >= 2) {
+                // Vis søgeresultater og skjul almindeligt indhold
+                searchResults.classList.remove('hidden');
+                regularContent.classList.add('hidden');
+
+                // Ryd tidligere resultater
+                resultsContainer.innerHTML = '';
+
+                // Filtrer nyheder
+                let matchCount = 0;
+
+                // Lav et klon af hver matchende nyhed og tilføj til resultaterne
+                newsItems.forEach(item => {
+                    const title = item.getAttribute('data-title').toLowerCase();
+                    const content = item.getAttribute('data-content').toLowerCase();
+                    const isFeatured = item.hasAttribute('data-featured') ? item.getAttribute('data-featured') === '1' : false;
+                    const newsId = item.getAttribute('data-id');
+
+                    if (title.includes(query) || content.includes(query)) {
+                        const clone = item.cloneNode(true);
+
+                        // Find pin-knappen og opdater ikonet baseret på status
+                        const pinButton = clone.querySelector('[onclick^="toggleFeatured"]');
+                        if (pinButton) {
+                            if (isFeatured) {
+                                pinButton.className = "text-primary hover:text-primary/90 transition-colors text-xl";
+                                pinButton.setAttribute("title", "Fjern fremhævning");
+                                pinButton.querySelector('i').className = "fas fa-thumbtack"; // Solid ikon for pinned
+                            } else {
+                                pinButton.className = "text-gray-400 hover:text-primary transition-colors text-xl";
+                                pinButton.setAttribute("title", "Fremhæv denne nyhed");
+                                pinButton.querySelector('i').className = "fa fa-thumbtack"; // Regular ikon for unpinned
+                            }
                         }
 
-                        // Tjek filstørrelse (5MB)
-                        if (file.size > 5 * 1024 * 1024) {
-                            alert('Billedet må maksimalt være 5MB');
-                            this.value = '';
-                            return;
+                        // Fremhæv søgeordet i titel og indhold
+                        const titleEl = clone.querySelector('h3');
+                        const contentEl = clone.querySelector('.news-content');
+
+                        if (titleEl && title.includes(query)) {
+                            const highlightedTitle = titleEl.textContent.replace(
+                                new RegExp(query, 'gi'),
+                                match => `<span class="bg-yellow-100">${match}</span>`
+                            );
+                            titleEl.innerHTML = highlightedTitle;
                         }
 
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            currentProfilePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover">`;
-                        };
-                        reader.readAsDataURL(file);
+                        if (contentEl && content.includes(query)) {
+                            // Find konteksten omkring søgeordet
+                            const index = content.indexOf(query);
+                            let start = Math.max(0, index - 50);
+                            let end = Math.min(content.length, index + query.length + 50);
+
+                            // Juster start og slut til at starte og slutte ved ordgrænser
+                            while (start > 0 && content[start] !== ' ') start--;
+                            while (end < content.length && content[end] !== ' ') end++;
+
+                            let snippet = content.substring(start, end);
+                            if (start > 0) snippet = '...' + snippet;
+                            if (end < content.length) snippet = snippet + '...';
+
+                            // Fremhæv søgeordet i snippeten
+                            const highlightedSnippet = snippet.replace(
+                                new RegExp(query, 'gi'),
+                                match => `<span class="bg-yellow-100">${match}</span>`
+                            );
+
+                            contentEl.innerHTML = highlightedSnippet;
+                        }
+
+                        resultsContainer.appendChild(clone);
+                        matchCount++;
                     }
                 });
-            }
 
-            // Image preview for new user
-            const newUserImageInput = document.getElementById('new-user-image-input');
-            const newUserImagePreview = document.getElementById('new-user-image-preview');
-
-            if (newUserImageInput && newUserImagePreview) {
-                newUserImageInput.addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (file) {
-                        // Tjek filtype
-                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                        if (!allowedTypes.includes(file.type.toLowerCase())) {
-                            alert('Kun JPEG, PNG, GIF og WebP billeder er tilladt');
-                            this.value = '';
-                            return;
-                        }
-
-                        // Tjek filstørrelse (5MB)
-                        if (file.size > 5 * 1024 * 1024) {
-                            alert('Billedet må maksimalt være 5MB');
-                            this.value = '';
-                            return;
-                        }
-
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            newUserImagePreview.innerHTML = `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover">`;
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                });
-            }
-
-            // Form validation for update profile form
-            document.getElementById('update-profile-form').addEventListener('submit', function(e) {
-                const name = document.getElementById('name').value;
-                const username = document.getElementById('username').value;
-                const email = document.getElementById('email').value;
-
-                if (name.trim() === '' || username.trim() === '' || email.trim() === '') {
-                    e.preventDefault();
-                    showAlert('Fejl', 'Navn, brugernavn og email skal udfyldes', 'error');
-                    return false;
+                // Vis besked hvis ingen resultater
+                if (matchCount === 0) {
+                    resultsContainer.innerHTML = `
+                        <div class="col-span-2 bg-white rounded-xl shadow p-6 text-center">
+                            <p class="text-gray-500">Ingen nyheder fundet, der matcher "${query}".</p>
+                        </div>
+                    `;
                 }
-
-                return true;
-            });
-
-            // Form validation for change password form
-            document.getElementById('change-password-form').addEventListener('submit', function(e) {
-                const currentPassword = document.getElementById('current-password').value;
-                const newPassword = document.getElementById('new-password').value;
-                const confirmPassword = document.getElementById('confirm-password').value;
-
-                if (currentPassword.trim() === '' || newPassword.trim() === '' || confirmPassword.trim() === '') {
-                    e.preventDefault();
-                    showAlert('Fejl', 'Alle felter skal udfyldes', 'error');
-                    return false;
-                }
-                if (newPassword !== confirmPassword) {
-                    e.preventDefault();
-                    showAlert('Fejl', 'De nye adgangskoder matcher ikke', 'error');
-                    return false;
-                }
-
-                if (newPassword.length < 8) {
-                    e.preventDefault();
-                    showAlert('Fejl', 'Adgangskoden skal være mindst 8 tegn', 'error');
-                    return false;
-                }
-
-                return true;
-            });
-
-            <?php if ($_SESSION['role'] === 'Administrator'): ?>
-                // Form validation for add user form
-                document.getElementById('add-user-form').addEventListener('submit', function(e) {
-                    const newUserName = document.getElementById('new-user-name').value;
-                    const newUserEmail = document.getElementById('new-user-email').value;
-                    const newUsername = document.getElementById('new-username').value;
-                    const newUserPassword = document.getElementById('new-user-password').value;
-
-                    if (newUserName.trim() === '' || newUsername.trim() === '' || newUserPassword.trim() === '' || newUserEmail.trim() === '') {
-                        e.preventDefault();
-                        showAlert('Fejl', 'Alle påkrævede felter skal udfyldes', 'error');
-                        return false;
-                    }
-
-                    if (newUserPassword.length < 8) {
-                        e.preventDefault();
-                        showAlert('Fejl', 'Adgangskoden skal være mindst 8 tegn', 'error');
-                        return false;
-                    }
-
-                    // Validate email format
-                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                    if (!emailRegex.test(newUserEmail)) {
-                        e.preventDefault();
-                        showAlert('Fejl', 'Indtast en gyldig email-adresse', 'error');
-                        return false;
-                    }
-
-                    return true;
-                });
-            <?php endif; ?>
-
-            // Delete user confirmation modal functionality
-            const deleteUserModal = document.getElementById('delete-user-modal');
-            const deleteUserModalContainer = deleteUserModal.querySelector('.bg-white');
-            const cancelDeleteUserBtn = document.getElementById('cancel-delete-user');
-            const deleteUserIdField = document.getElementById('delete-user-id');
-            const deleteUserMessage = document.getElementById('delete-user-message');
-
-            function confirmDeleteUser(userId, userName) {
-                deleteUserIdField.value = userId;
-                deleteUserMessage.textContent = `Er du sikker på, at du vil slette brugeren "${userName}"?`;
-
-                // Vis modal med animation
-                deleteUserModal.classList.remove('hidden');
-                setTimeout(() => {
-                    deleteUserModal.classList.add('opacity-100');
-                    deleteUserModalContainer.classList.remove('scale-95');
-                    deleteUserModalContainer.classList.add('scale-100');
-                }, 10);
-                document.body.classList.add('overflow-hidden');
-            }
-
-            function closeDeleteUserModal() {
-                // Skjul modal med animation
-                deleteUserModal.classList.remove('opacity-100');
-                deleteUserModalContainer.classList.remove('scale-100');
-                deleteUserModalContainer.classList.add('scale-95');
-
-                // Vent på at animationen er færdig før vi fjerner modalen helt
-                setTimeout(() => {
-                    deleteUserModal.classList.add('hidden');
-                    document.body.classList.remove('overflow-hidden');
-                }, 300);
-            }
-
-            cancelDeleteUserBtn.addEventListener('click', closeDeleteUserModal);
-
-            // Luk delete modal når der klikkes udenfor
-            deleteUserModal.addEventListener('click', (e) => {
-                if (e.target === deleteUserModal) {
-                    closeDeleteUserModal();
-                }
-            });
-
-            // Luk delete modal med Escape-tasten
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && !deleteUserModal.classList.contains('hidden')) {
-                    closeDeleteUserModal();
-                }
-            });
-
-            // Helper function to show alerts
-            function showAlert(title, message, type) {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'fixed top-6 right-6 p-4 rounded-lg shadow-lg z-50 flex items-center gap-3 ' +
-                    (type === 'success' ? 'bg-green-100 border-l-4 border-green-500 text-green-700' : 'bg-red-100 border-l-4 border-red-500 text-red-700');
-
-                alertDiv.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
-                <div>
-                    <h3 class="font-bold">${title}</h3>
-                    <p>${message}</p>
-                </div>
-            `;
-
-                document.body.appendChild(alertDiv);
-
-                // Fade in
-                alertDiv.style.opacity = '0';
-                alertDiv.style.transition = 'opacity 0.3s ease-in-out';
-                setTimeout(() => {
-                    alertDiv.style.opacity = '1';
-                }, 10);
-
-                // Remove after 3 seconds
-                setTimeout(() => {
-                    alertDiv.style.opacity = '0';
-                    setTimeout(() => {
-                        document.body.removeChild(alertDiv);
-                    }, 300);
-                }, 3000);
+            } else {
+                // Vis almindeligt indhold og skjul søgeresultater
+                searchResults.classList.add('hidden');
+                regularContent.classList.remove('hidden');
             }
         });
 
-        // Make confirmDeleteUser function globally available
-        window.confirmDeleteUser = function(userId, userName) {
-            const deleteUserIdField = document.getElementById('delete-user-id');
-            const deleteUserMessage = document.getElementById('delete-user-message');
-            const deleteUserModal = document.getElementById('delete-user-modal');
-            const deleteUserModalContainer = deleteUserModal.querySelector('.bg-white');
+        // Ryd søgning
+        clearSearchBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            searchResults.classList.add('hidden');
+            regularContent.classList.remove('hidden');
+        });
 
-            deleteUserIdField.value = userId;
-            deleteUserMessage.textContent = `Er du sikker på, at du vil slette brugeren ${userName}?`;
+        // Readers modal
+        const modal = document.getElementById('readers-modal');
+        const modalContainer = modal.querySelector('.bg-white');
+        const closeModalBtn = document.getElementById('close-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalContent = document.getElementById('modal-content');
 
-            // Vis modal med animation
-            deleteUserModal.classList.remove('hidden');
+        function showReaders(newsId) {
+            // AJAX-kald for at hente læserliste
+            fetch(`get-readers.php?news_id=${newsId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Opdater modal titel
+                    modalTitle.textContent = "Læst af";
+
+                    // Opdater modal indhold
+                    if (data.readers.length > 0) {
+                        modalContent.innerHTML = `
+                            <div class="bg-gray-50 rounded-lg p-4 max-h-80 overflow-y-auto">
+                                <table class="w-full">
+                                    <thead class="border-b border-gray-200">
+                                        <tr>
+                                            <th class="text-left font-medium text-gray-500 pb-2">Navn</th>
+                                            <th class="text-left font-medium text-gray-500 pb-2">Værelse</th>
+                                            <th class="text-left font-medium text-gray-500 pb-2">Tidspunkt</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.readers.map(reader => `
+                                            <tr class="border-b border-gray-100">
+                                                <td class="py-2">${reader.name}</td>
+                                                <td class="py-2">${reader.room}</td>
+                                                <td class="py-2 text-gray-500 text-sm">${reader.time}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `;
+                    } else {
+                        modalContent.innerHTML = `
+                            <div class="bg-gray-50 rounded-lg p-4 text-center">
+                                <p class="text-gray-500">Ingen har læst denne nyhed endnu.</p>
+                            </div>
+                        `;
+                    }
+
+                    modalContent.innerHTML += `
+                        <div class="flex justify-end mt-4">
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                                Luk
+                            </button>
+                        </div>
+                    `;
+
+                    // Vis modal med animation
+                    showModal();
+                })
+                .catch(error => {
+                    console.error('Error fetching readers:', error);
+                    modalContent.innerHTML = `
+                        <div class="bg-red-50 rounded-lg p-4 text-center">
+                            <p class="text-red-500">Der opstod en fejl ved hentning af læserlisten.</p>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                                Luk
+                            </button>
+                        </div>
+                    `;
+                    showModal();
+                });
+        }
+
+        function showModal() {
+            modal.classList.remove('hidden');
+            // Kort timeout for at sikre at transitioner virker korrekt efter at elementet er vist
             setTimeout(() => {
-                deleteUserModal.classList.add('opacity-100');
-                deleteUserModalContainer.classList.remove('scale-95');
-                deleteUserModalContainer.classList.add('scale-100');
+                modal.classList.add('opacity-100');
+                modalContainer.classList.remove('scale-95');
+                modalContainer.classList.add('scale-100');
             }, 10);
             document.body.classList.add('overflow-hidden');
-        };
+        }
+
+        function closeModal() {
+            // Skjul modal med animation
+            modal.classList.remove('opacity-100');
+            modalContainer.classList.remove('scale-100');
+            modalContainer.classList.add('scale-95');
+
+            // Vent på at animationen er færdig før vi fjerner modalen helt
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }, 300);
+        }
+
+        closeModalBtn.addEventListener('click', closeModal);
+
+        // Luk modal når der klikkes udenfor
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Luk modal med Escape-tasten
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+
+        // Delete confirmation
+        const deleteModal = document.getElementById('delete-confirm-modal');
+        const deleteModalContainer = deleteModal.querySelector('.bg-white');
+        const cancelDeleteBtn = document.getElementById('cancel-delete');
+        const deleteNewsIdField = document.getElementById('delete-news-id');
+
+        function confirmDelete(newsId) {
+            deleteNewsIdField.value = newsId;
+
+            // Vis modal med animation
+            deleteModal.classList.remove('hidden');
+            setTimeout(() => {
+                deleteModal.classList.add('opacity-100');
+                deleteModalContainer.classList.remove('scale-95');
+                deleteModalContainer.classList.add('scale-100');
+            }, 10);
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeDeleteModal() {
+            // Skjul modal med animation
+            deleteModal.classList.remove('opacity-100');
+            deleteModalContainer.classList.remove('scale-100');
+            deleteModalContainer.classList.add('scale-95');
+
+            // Vent på at animationen er færdig før vi fjerner modalen helt
+            setTimeout(() => {
+                deleteModal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }, 300);
+        }
+
+        cancelDeleteBtn.addEventListener('click', closeDeleteModal);
+
+        // Luk delete modal når der klikkes udenfor
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) {
+                closeDeleteModal();
+            }
+        });
+
+        // Luk delete modal med Escape-tasten
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !deleteModal.classList.contains('hidden')) {
+                closeDeleteModal();
+            }
+        });
+
+        // Fremhævet nyhed toggle
+        function toggleFeatured(newsId, isFeatured) {
+            // Send AJAX-kald for at ændre fremhævet status
+            fetch('toggle-featured.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `news_id=${newsId}&is_featured=${isFeatured}`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Genindlæs siden for at vise ændringerne
+                        window.location.reload();
+                    } else {
+                        alert('Der opstod en fejl: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Der opstod en fejl ved opdatering af nyheden.');
+                });
+        }
+
+        // Gendan event listeners til søgeresultater
+        document.addEventListener('click', function(e) {
+            // Find den nærmeste .news-item-forælder
+            const newsItem = e.target.closest('.news-item');
+
+            if (newsItem) {
+                // Find den knap, der blev klikket på
+                const deleteBtn = e.target.closest('[onclick^="confirmDelete"]');
+                const featuredBtn = e.target.closest('[onclick^="toggleFeatured"]');
+                const readersBtn = e.target.closest('[onclick^="showReaders"]');
+
+                if (deleteBtn) {
+                    const match = deleteBtn.getAttribute('onclick').match(/confirmDelete\((\d+)\)/);
+                    if (match && match[1]) {
+                        confirmDelete(parseInt(match[1]));
+                    }
+                } else if (featuredBtn) {
+                    const match = featuredBtn.getAttribute('onclick').match(/toggleFeatured\((\d+),\s*(\d+)\)/);
+                    if (match && match[1] && match[2] !== undefined) {
+                        toggleFeatured(parseInt(match[1]), parseInt(match[2]));
+                    }
+                } else if (readersBtn) {
+                    const match = readersBtn.getAttribute('onclick').match(/showReaders\((\d+)\)/);
+                    if (match && match[1]) {
+                        showReaders(parseInt(match[1]));
+                    }
+                }
+            }
+        });
     </script>
 </body>
 

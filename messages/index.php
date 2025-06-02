@@ -77,36 +77,7 @@ while ($row = $result->fetch_assoc()) {
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="da">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beskeder - Mercantec Kollegium</title>
-    <style>
-        /* Tilføj ekstra CSS for at sikre konsistent design */
-        .contacts-sidebar {
-            transition: all 0.3s ease;
-        }
-
-        .conversation-area {
-            transition: all 0.3s ease;
-        }
-
-        @media (max-width: 768px) {
-            .page-content {
-                display: flex;
-                flex-direction: column;
-                height: calc(100vh - 60px);
-                /* Højde minus den mobile navbar */
-                overflow: hidden;
-            }
-        }
-    </style>
-</head>
-
-<body class="font-sans bg-gray-100 min-h-screen">
+<body class="font-poppins bg-gray-100 min-h-screen">
     <div class="flex h-full">
         <?php include '../components/sidebar.php'; ?>
 
