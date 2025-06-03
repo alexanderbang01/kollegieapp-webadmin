@@ -22,6 +22,33 @@ function logError($message) {
     $_SESSION['error_message'] = "Der opstod en fejl. Tjek venligst server log for detaljer.";
 }
 
+// Funktion til at oprette notifikation
+function createEventNotification($conn, $event_id, $title, $date, $time, $created_by, $is_new = true) {
+    try {
+        $notification_title = $is_new ? "Ny begivenhed: $title" : "Begivenhed opdateret: $title";
+        $notification_content = $is_new 
+            ? "Der er oprettet en ny begivenhed d. $date kl. $time." 
+            : "Begivenheden '$title' er blevet opdateret.";
+        
+        $notification_sql = "INSERT INTO notifications (type, title, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)";
+        $notification_stmt = $conn->prepare($notification_sql);
+        
+        $type = 'event';
+        $notification_stmt->bind_param("sssii", 
+            $type, 
+            $notification_title, 
+            $notification_content, 
+            $event_id, 
+            $created_by
+        );
+        
+        return $notification_stmt->execute();
+    } catch (Exception $e) {
+        error_log("Fejl ved oprettelse af begivenhedsnotifikation: " . $e->getMessage());
+        return false;
+    }
+}
+
 try {
     // Tjek om det er en POST request
     if ($_SERVER['REQUEST_METHOD'] != 'POST') {
@@ -40,7 +67,7 @@ try {
     $time = isset($_POST['time']) ? $_POST['time'] : null;
     $description = isset($_POST['description']) ? trim($_POST['description']) : null;
     $max_participants = isset($_POST['max_participants']) && !empty($_POST['max_participants']) ? (int)$_POST['max_participants'] : null;
-    $created_by = isset($_POST['created_by']) ? (int)$_POST['created_by'] : $_SESSION['user_id']; // Brug brugerens ID fra POST eller session
+    $created_by = isset($_POST['created_by']) ? (int)$_POST['created_by'] : $_SESSION['user_id'];
     
     // Tjek at påkrævede felter eksisterer
     if (!$title || !$location || !$date || !$time || !$description) {
@@ -52,6 +79,7 @@ try {
     
     // Tjek om begivenheds-ID er angivet (for redigering)
     $event_id = isset($_POST['event_id']) ? (int)$_POST['event_id'] : null;
+    $is_new_event = !$event_id;
     
     if ($event_id) {
         // Opdater eksisterende begivenhed
@@ -75,6 +103,8 @@ try {
         $stmt->execute();
         
         if ($stmt->affected_rows > 0) {
+            // Opret notifikation for opdateret begivenhed
+            createEventNotification($conn, $event_id, $title, $date, $time, $created_by, false);
             $_SESSION['success_message'] = "Begivenheden blev opdateret!";
         } else {
             // Tjek om begivenheden eksisterer, men tilhører en anden bruger
@@ -107,6 +137,12 @@ try {
         $stmt->execute();
         
         if ($stmt->affected_rows === 1) {
+            // Hent det nye event ID
+            $new_event_id = $conn->insert_id;
+            
+            // Opret notifikation for ny begivenhed
+            createEventNotification($conn, $new_event_id, $title, $date, $time, $created_by, true);
+            
             $_SESSION['success_message'] = "Begivenheden blev oprettet!";
         } else {
             throw new Exception("Begivenheden kunne ikke gemmes");

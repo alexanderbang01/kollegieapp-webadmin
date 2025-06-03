@@ -22,6 +22,38 @@ function logError($message) {
     $_SESSION['error_message'] = "Der opstod en fejl. Tjek venligst server log for detaljer.";
 }
 
+// Funktion til at oprette notifikation
+function createNewsNotification($conn, $news_id, $title, $created_by, $is_new = true, $is_featured = false) {
+    try {
+        $notification_title = $is_new ? "Ny nyhed: $title" : "Nyhed opdateret: $title";
+        
+        if ($is_new && $is_featured) {
+            $notification_content = "Der er udgivet en vigtig nyhed: '$title'. Læs mere i nyheder.";
+        } elseif ($is_new) {
+            $notification_content = "Der er udgivet en ny nyhed. Læs mere i nyheder.";
+        } else {
+            $notification_content = "Nyheden '$title' er blevet opdateret.";
+        }
+        
+        $notification_sql = "INSERT INTO notifications (type, title, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)";
+        $notification_stmt = $conn->prepare($notification_sql);
+        
+        $type = 'news';
+        $notification_stmt->bind_param("sssii", 
+            $type, 
+            $notification_title, 
+            $notification_content, 
+            $news_id, 
+            $created_by
+        );
+        
+        return $notification_stmt->execute();
+    } catch (Exception $e) {
+        error_log("Fejl ved oprettelse af nyhedsnotifikation: " . $e->getMessage());
+        return false;
+    }
+}
+
 try {
     // Tjek om det er en POST request
     if ($_SERVER['REQUEST_METHOD'] != 'POST') {
@@ -36,7 +68,6 @@ try {
     // Hent formdata
     $title = isset($_POST['title']) ? trim($_POST['title']) : null;
     $content = isset($_POST['content']) ? trim($_POST['content']) : null;
-    // Fjern is_important da kolonnen ikke eksisterer i databasen
     $is_featured = isset($_POST['is_featured']) ? 1 : 0;
     $created_by = isset($_POST['created_by']) ? (int)$_POST['created_by'] : $_SESSION['user_id'];
     
@@ -50,9 +81,10 @@ try {
     
     // Tjek om nyhed ID er angivet (for redigering)
     $news_id = isset($_POST['news_id']) ? (int)$_POST['news_id'] : null;
+    $is_new_news = !$news_id;
     
     if ($news_id) {
-        // Opdater eksisterende nyhed - fjern is_important fra SQL
+        // Opdater eksisterende nyhed
         $sql = "UPDATE news SET 
                 title = ?, content = ?, is_featured = ?
                 WHERE id = ? AND created_by = ?";
@@ -69,6 +101,8 @@ try {
         $stmt->execute();
         
         if ($stmt->affected_rows > 0) {
+            // Opret notifikation for opdateret nyhed
+            createNewsNotification($conn, $news_id, $title, $created_by, false, $is_featured);
             $_SESSION['success_message'] = "Nyheden blev opdateret!";
         } else {
             // Tjek om nyheden eksisterer, men tilhører en anden bruger
@@ -90,7 +124,7 @@ try {
             $conn->query($update_sql);
         }
         
-        // Indsæt ny nyhed - fjern is_important fra SQL
+        // Indsæt ny nyhed
         $sql = "INSERT INTO news (title, content, is_featured, created_by) 
                 VALUES (?, ?, ?, ?)";
         
@@ -105,6 +139,12 @@ try {
         $stmt->execute();
         
         if ($stmt->affected_rows === 1) {
+            // Hent det nye news ID
+            $new_news_id = $conn->insert_id;
+            
+            // Opret notifikation for ny nyhed
+            createNewsNotification($conn, $new_news_id, $title, $created_by, true, $is_featured);
+            
             $_SESSION['success_message'] = "Nyheden blev oprettet!";
         } else {
             throw new Exception("Nyheden kunne ikke gemmes");
