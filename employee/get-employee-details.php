@@ -2,6 +2,10 @@
 // Start session
 session_start();
 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 // Tjek om bruger er logget ind, ellers send fejl
 if (!isset($_SESSION['user_id'])) {
     header('Content-Type: application/json');
@@ -24,7 +28,7 @@ $employee_id = (int)$_GET['id'];
 // Hent ansatte fra databasen
 if (isset($conn)) {
     $stmt = $conn->prepare("SELECT * FROM employee WHERE id = ?");
-    $stmt->bind_param("i", $resident_id);
+    $stmt->bind_param("i", $employee_id);
     $stmt->execute();
     $result = $stmt->get_result();
     

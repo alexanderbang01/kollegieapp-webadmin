@@ -247,58 +247,6 @@ include '../database/db_conn.php';
                         </tbody>
                     </table>
                 </div>
-
-                <!-- Pagination -->
-                <div id="pagination-container">
-                    <?php if ($total_pages > 1): ?>
-                        <div class="flex justify-between items-center">
-                            <div class="text-gray-500 text-sm">
-                                Viser <?php echo $offset + 1; ?>-<?php echo min($offset + count($employees), $total_employees); ?> af <?php echo $total_employees; ?> ansatte
-                            </div>
-                            <div class="flex gap-1">
-                                <a href="?page=<?php echo max(1, $page_number - 1); ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number > 1 ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
-                                    <i class="fas fa-chevron-left"></i>
-                                </a>
-
-                                <?php
-                                // Vis begrænset antal sider, hvis der er mange
-                                $max_visible_pages = 5;
-                                $start_page = max(1, min($page_number - floor($max_visible_pages / 2), $total_pages - $max_visible_pages + 1));
-                                $end_page = min($start_page + $max_visible_pages - 1, $total_pages);
-
-                                if ($start_page > 1):
-                                ?>
-                                    <a href="?page=1&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                                        1
-                                    </a>
-                                    <?php if ($start_page > 2): ?>
-                                        <span class="w-8 h-8 flex items-center justify-center text-gray-500">...</span>
-                                    <?php endif; ?>
-                                <?php endif; ?>
-
-                                <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
-                                    <a href="?page=<?php echo $i; ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $i == $page_number ? 'bg-primary text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors'; ?>">
-                                        <?php echo $i; ?>
-                                    </a>
-                                <?php endfor; ?>
-
-                                <?php if ($end_page < $total_pages): ?>
-                                    <?php if ($end_page < $total_pages - 1): ?>
-                                        <span class="w-8 h-8 flex items-center justify-center text-gray-500">...</span>
-                                    <?php endif; ?>
-                                    <a href="?page=<?php echo $total_pages; ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors">
-                                        <?php echo $total_pages; ?>
-                                    </a>
-                                <?php endif; ?>
-
-                                <a href="?page=<?php echo min($total_pages, $page_number + 1); ?>&search=<?php echo isset($_GET['search']) ? urlencode($_GET['search']) : ''; ?>" class="w-8 h-8 rounded flex items-center justify-center <?php echo $page_number < $total_pages ? 'bg-gray-200 hover:bg-gray-300 text-gray-700 transition-colors' : 'bg-gray-200 text-gray-400 cursor-not-allowed'; ?>">
-                                    <i class="fas fa-chevron-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                </div>
-
                 <!-- Search Results (hidden by default) -->
                 <div id="search-results" class="hidden">
                     <!-- List view search results -->
