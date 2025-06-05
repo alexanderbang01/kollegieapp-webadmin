@@ -23,16 +23,14 @@ function logError($message) {
 }
 
 // Funktion til at oprette notifikation
-function createNewsNotification($conn, $news_id, $title, $created_by, $is_new = true, $is_featured = false) {
+function createNewsNotification($conn, $news_id, $title, $created_by, $is_featured = false) {
     try {
-        $notification_title = $is_new ? "Ny nyhed: $title" : "Nyhed opdateret: $title";
+        $notification_title = "Ny nyhed: $title";
         
-        if ($is_new && $is_featured) {
+        if ($is_featured) {
             $notification_content = "Der er udgivet en vigtig nyhed: '$title'. Læs mere i nyheder.";
-        } elseif ($is_new) {
-            $notification_content = "Der er udgivet en ny nyhed. Læs mere i nyheder.";
         } else {
-            $notification_content = "Nyheden '$title' er blevet opdateret.";
+            $notification_content = "Der er udgivet en ny nyhed. Læs mere i nyheder.";
         }
         
         $notification_sql = "INSERT INTO notifications (type, title, content, related_id, created_by) VALUES (?, ?, ?, ?, ?)";
@@ -50,6 +48,20 @@ function createNewsNotification($conn, $news_id, $title, $created_by, $is_new = 
         return $notification_stmt->execute();
     } catch (Exception $e) {
         error_log("Fejl ved oprettelse af nyhedsnotifikation: " . $e->getMessage());
+        return false;
+    }
+}
+
+// Funktion til at logge aktivitet
+function logActivity($conn, $user_id, $activity_type, $description) {
+    try {
+        $activity_sql = "INSERT INTO activities (user_id, activity_type, description) VALUES (?, ?, ?)";
+        $activity_stmt = $conn->prepare($activity_sql);
+        $activity_stmt->bind_param("iss", $user_id, $activity_type, $description);
+        
+        return $activity_stmt->execute();
+    } catch (Exception $e) {
+        error_log("Fejl ved logging af aktivitet: " . $e->getMessage());
         return false;
     }
 }
@@ -101,8 +113,9 @@ try {
         $stmt->execute();
         
         if ($stmt->affected_rows > 0) {
-            // Opret notifikation for opdateret nyhed
-            createNewsNotification($conn, $news_id, $title, $created_by, false, $is_featured);
+            // Log aktivitet for opdateret nyhed
+            logActivity($conn, $created_by, 'news_updated', "Opdaterede nyheden: $title");
+            
             $_SESSION['success_message'] = "Nyheden blev opdateret!";
         } else {
             // Tjek om nyheden eksisterer, men tilhører en anden bruger
@@ -143,7 +156,10 @@ try {
             $new_news_id = $conn->insert_id;
             
             // Opret notifikation for ny nyhed
-            createNewsNotification($conn, $new_news_id, $title, $created_by, true, $is_featured);
+            createNewsNotification($conn, $new_news_id, $title, $created_by, $is_featured);
+            
+            // Log aktivitet for ny nyhed
+            logActivity($conn, $created_by, 'news_created', "Oprettede ny nyhed: $title");
             
             $_SESSION['success_message'] = "Nyheden blev oprettet!";
         } else {
