@@ -172,8 +172,8 @@ if (isset($conn)) {
                             <div class="bg-white rounded-xl shadow overflow-hidden animate-fade-in">
                                 <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
                                     <div class="flex items-center gap-3">
-                                        <div class="bg-<?php echo $featuredNews['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo $featuredNews['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
-                                            <i class="fas fa-<?php echo $featuredNews['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
+                                        <div class="bg-<?php echo isset($featuredNews['is_important']) && $featuredNews['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo isset($featuredNews['is_important']) && $featuredNews['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
+                                            <i class="fas fa-<?php echo isset($featuredNews['is_important']) && $featuredNews['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
                                         </div>
                                         <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($featuredNews['title']); ?></h3>
                                     </div>
@@ -193,9 +193,9 @@ if (isset($conn)) {
                                     <div class="flex justify-between mb-3">
                                         <div class="flex items-center gap-2">
                                             <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
-                                                <span class="font-medium text-xs"><?php echo strtoupper(substr($featuredNews['username'], 0, 2)); ?></span>
+                                                <span class="font-medium text-xs"><?php echo strtoupper(substr($featuredNews['username'] ?? 'U', 0, 2)); ?></span>
                                             </div>
-                                            <span class="font-medium"><?php echo htmlspecialchars($featuredNews['author_name']); ?></span>
+                                            <span class="font-medium"><?php echo htmlspecialchars($featuredNews['author_name'] ?? 'Ukendt'); ?></span>
                                         </div>
                                         <div class="text-gray-500 text-sm">
                                             <?php
@@ -207,13 +207,13 @@ if (isset($conn)) {
                                     <p class="text-gray-700 mb-4"><?php echo nl2br(htmlspecialchars($featuredNews['content'])); ?></p>
                                     <div class="flex justify-between items-center">
                                         <div>
-                                            <?php if ($featuredNews['is_important']): ?>
+                                            <?php if (isset($featuredNews['is_important']) && $featuredNews['is_important']): ?>
                                                 <span class="px-2 py-1 bg-danger/10 text-danger text-xs rounded-full">Vigtig</span>
                                             <?php endif; ?>
                                         </div>
                                         <div class="flex items-center gap-1 text-gray-500 text-sm cursor-pointer hover:text-primary transition-colors" onclick="showReaders(<?php echo $featuredNews['id']; ?>)">
                                             <i class="far fa-eye"></i>
-                                            <span><?php echo $featuredNews['read_count']; ?></span>
+                                            <span><?php echo $featuredNews['read_count'] ?? 0; ?></span>
                                         </div>
                                     </div>
                                 </div>
@@ -234,12 +234,12 @@ if (isset($conn)) {
                                 <div class="bg-white rounded-xl shadow overflow-hidden animate-fade-in delay-<?php echo ($index % 4) * 100; ?> news-item"
                                     data-title="<?php echo htmlspecialchars($item['title']); ?>"
                                     data-content="<?php echo htmlspecialchars($item['content']); ?>"
-                                    data-featured="<?php echo $item['is_featured']; ?>"
+                                    data-featured="<?php echo $item['is_featured'] ?? 0; ?>"
                                     data-id="<?php echo $item['id']; ?>">
                                     <div class="p-4 border-b border-gray-100 bg-primary/5 flex justify-between items-center">
                                         <div class="flex items-center gap-3">
-                                            <div class="bg-<?php echo $item['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo $item['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
-                                                <i class="fas fa-<?php echo $item['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
+                                            <div class="bg-<?php echo isset($item['is_important']) && $item['is_important'] ? 'danger' : 'primary'; ?>/10 text-<?php echo isset($item['is_important']) && $item['is_important'] ? 'danger' : 'primary'; ?> p-2 rounded-lg">
+                                                <i class="fas fa-<?php echo isset($item['is_important']) && $item['is_important'] ? 'exclamation-circle' : 'newspaper'; ?> text-lg"></i>
                                             </div>
                                             <h3 class="font-bold text-gray-800"><?php echo htmlspecialchars($item['title']); ?></h3>
                                         </div>
@@ -259,9 +259,9 @@ if (isset($conn)) {
                                         <div class="flex justify-between mb-3">
                                             <div class="flex items-center gap-2">
                                                 <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">
-                                                    <span class="font-medium text-xs"><?php echo strtoupper(substr($item['username'], 0, 2)); ?></span>
+                                                    <span class="font-medium text-xs"><?php echo strtoupper(substr($item['username'] ?? 'U', 0, 2)); ?></span>
                                                 </div>
-                                                <span class="font-medium"><?php echo htmlspecialchars($item['author_name']); ?></span>
+                                                <span class="font-medium"><?php echo htmlspecialchars($item['author_name'] ?? 'Ukendt'); ?></span>
                                             </div>
                                             <div class="text-gray-500 text-sm">
                                                 <?php
@@ -279,13 +279,13 @@ if (isset($conn)) {
                                         </p>
                                         <div class="flex justify-between items-center">
                                             <div>
-                                                <?php if ($item['is_important']): ?>
+                                                <?php if (isset($item['is_important']) && $item['is_important']): ?>
                                                     <span class="px-2 py-1 bg-danger/10 text-danger text-xs rounded-full">Vigtig</span>
                                                 <?php endif; ?>
                                             </div>
                                             <div class="flex items-center gap-1 text-gray-500 text-sm cursor-pointer hover:text-primary transition-colors" onclick="showReaders(<?php echo $item['id']; ?>)">
                                                 <i class="far fa-eye"></i>
-                                                <span><?php echo $item['read_count']; ?></span>
+                                                <span><?php echo $item['read_count'] ?? 0; ?></span>
                                             </div>
                                         </div>
                                     </div>
@@ -533,28 +533,28 @@ if (isset($conn)) {
                                             <tr class="border-b border-gray-100">
                                                 <td class="py-2">${reader.name}</td>
                                                 <td class="py-2">${reader.room}</td>
-                                                <td class="py-2 text-gray-500 text-sm">${reader.time}</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        `;
+                                               <td class="py-2 text-gray-500 text-sm">${reader.time}</td>
+                                           </tr>
+                                       `).join('')}
+                                   </tbody>
+                               </table>
+                           </div>
+                       `;
                     } else {
                         modalContent.innerHTML = `
-                            <div class="bg-gray-50 rounded-lg p-4 text-center">
-                                <p class="text-gray-500">Ingen har læst denne nyhed endnu.</p>
-                            </div>
-                        `;
+                           <div class="bg-gray-50 rounded-lg p-4 text-center">
+                               <p class="text-gray-500">Ingen har læst denne nyhed endnu.</p>
+                           </div>
+                       `;
                     }
 
                     modalContent.innerHTML += `
-                        <div class="flex justify-end mt-4">
-                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                                Luk
-                            </button>
-                        </div>
-                    `;
+                       <div class="flex justify-end mt-4">
+                           <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                               Luk
+                           </button>
+                       </div>
+                   `;
 
                     // Vis modal med animation
                     showModal();
@@ -562,15 +562,15 @@ if (isset($conn)) {
                 .catch(error => {
                     console.error('Error fetching readers:', error);
                     modalContent.innerHTML = `
-                        <div class="bg-red-50 rounded-lg p-4 text-center">
-                            <p class="text-red-500">Der opstod en fejl ved hentning af læserlisten.</p>
-                        </div>
-                        <div class="flex justify-end mt-4">
-                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                                Luk
-                            </button>
-                        </div>
-                    `;
+                       <div class="bg-red-50 rounded-lg p-4 text-center">
+                           <p class="text-red-500">Der opstod en fejl ved hentning af læserlisten.</p>
+                       </div>
+                       <div class="flex justify-end mt-4">
+                           <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                               Luk
+                           </button>
+                       </div>
+                   `;
                     showModal();
                 });
         }

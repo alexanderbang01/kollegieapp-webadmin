@@ -748,7 +748,7 @@ while ($row = $result->fetch_assoc()) {
                         })
                         .catch(error => console.error('Fejl ved tjek af nye beskeder:', error));
                 }
-            }, 10000);
+            }, 1000);
 
             // Luk alle modaler når man klikker udenfor dem
             window.addEventListener('click', function(e) {
