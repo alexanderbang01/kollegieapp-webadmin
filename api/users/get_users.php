@@ -80,8 +80,8 @@ try {
             'name' => $row['name'],
             'email' => $row['email'],
             'phone' => $row['phone'],
-            'profesion' => $row['profession'], // Matcher original struktur
-            'role' => $row['profession'], // Ekstra for kompatibilitet
+            'profesion' => $row['profession'],
+            'role' => $row['profession'],
             'profile_image' => $row['profile_image'],
             'initials' => $initials,
             'type' => 'staff'

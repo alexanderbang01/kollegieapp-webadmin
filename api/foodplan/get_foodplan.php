@@ -1,7 +1,4 @@
 <?php
-// API/foodplan/get_foodplan.php
-// Henter madplan for en specifik uge
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');

@@ -1,7 +1,4 @@
 <?php
-// API/messages/mark_read.php
-// Markerer beskeder som læst
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');

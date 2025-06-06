@@ -1,7 +1,4 @@
 <?php
-// API/events/event_registration.php
-// Håndterer tilmelding og afmelding til begivenheder
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, DELETE, OPTIONS');

@@ -1,7 +1,4 @@
 <?php
-// API/auth/register_resident.php
-// Håndterer registrering og validering af beboere
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');

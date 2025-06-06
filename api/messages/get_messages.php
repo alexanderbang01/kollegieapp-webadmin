@@ -1,7 +1,4 @@
 <?php
-// API/messages/get_messages.php
-// Henter alle beskeder for en specifik samtale
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');

@@ -53,7 +53,7 @@ if (isset($_SESSION['name'])) {
                 <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
                     <span class="font-medium"><?php echo $userInitials; ?></span>
                 </div>
-                <div class="min-w-0"> <!-- Sikrer at indholdet ikke breder sig ud over containeren -->
+                <div class="min-w-0">
                     <p class="font-medium truncate whitespace-nowrap"><?php echo $displayName; ?></p>
                     <p class="text-xs text-gray-500"><?php echo ucfirst($_SESSION['role']); ?></p>
                 </div>

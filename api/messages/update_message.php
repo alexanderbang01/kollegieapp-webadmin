@@ -1,7 +1,4 @@
 <?php
-// API/messages/update_message.php
-// Opdaterer en eksisterende besked
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS');

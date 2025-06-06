@@ -187,7 +187,7 @@ try {
         ];
     }
     
-    // Sortér efter seneste besked
+    // Sorter efter seneste besked
     usort($conversations, function($a, $b) {
         if (!$a['lastMessageTime']) return 1;
         if (!$b['lastMessageTime']) return -1;

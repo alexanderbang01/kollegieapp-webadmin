@@ -1,7 +1,4 @@
 <?php
-// API/residents/update_resident.php
-// Opdaterer beboer oplysninger
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: PUT, POST, OPTIONS');

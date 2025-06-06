@@ -5,7 +5,7 @@ DROP DATABASE IF EXISTS kollegie;
 CREATE DATABASE IF NOT EXISTS kollegie DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_danish_ci;
 USE kollegie;
 
--- Users table for administrators and staff (kombineret med employees)
+-- Users table
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -73,7 +73,7 @@ CREATE TABLE foodplan_allergens (
     FOREIGN KEY (allergen_id) REFERENCES allergens(id) ON DELETE CASCADE
 );
 
--- Events table (begivenheder)
+-- Events table
 CREATE TABLE events (
     id INT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
@@ -165,7 +165,7 @@ CREATE TABLE notification_reads (
     UNIQUE KEY (notification_id, resident_id)
 );
 
--- Activities log (aktivitetslog)
+-- Activities log
 CREATE TABLE activities (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT DEFAULT NULL,

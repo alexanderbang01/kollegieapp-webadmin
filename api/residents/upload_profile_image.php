@@ -1,7 +1,4 @@
 <?php
-// API/residents/upload_profile_image.php
-// Uploader profilbillede for beboer
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
