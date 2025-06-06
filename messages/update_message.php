@@ -55,24 +55,22 @@ try {
     $stmt->bind_param("ii", $message_id, $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     if ($result->num_rows === 0) {
         $response['message'] = 'Du har ikke tilladelse til at redigere denne besked';
         echo json_encode($response);
         exit;
     }
-    
-    // Kryptér det nye indhold hvis nødvendigt
-    // Her antager vi at du har samme krypteringsfunktionalitet som i send_message.php
-    
+
+    // Kryptér det nye indhold
     // Generer en Initialization Vector (IV)
     $ivLength = 16; // 16 bytes for AES
     $iv = openssl_random_pseudo_bytes($ivLength);
     $iv_hex = bin2hex($iv);
-    
+
     // Krypteringsnøgle
     $key = "Mercantec2025KollegieHemmeligKrypteringsNogle";
-    
+
     // Kryptér med AES-256-CBC
     $encryptedContent = openssl_encrypt(
         $content,              // Data der skal krypteres
@@ -81,22 +79,21 @@ try {
         0,                     // Optioner (0 = padding er påkrævet)
         $iv                    // Initialization Vector
     );
-    
-    // Opdater beskeden i databasen
+
+    // Opdater beskeden i databasen - UDEN updated_at kolonne
     $stmt = $conn->prepare("
         UPDATE messages 
-        SET content = ?, encryption_iv = ?, updated_at = NOW() 
+        SET content = ?, encryption_iv = ? 
         WHERE id = ? AND sender_id = ? AND sender_type = 'staff'
     ");
     $stmt->bind_param("ssii", $encryptedContent, $iv_hex, $message_id, $user_id);
-    
+
     if ($stmt->execute()) {
         $response['success'] = true;
         $response['message'] = 'Besked opdateret';
     } else {
         $response['message'] = 'Kunne ikke opdatere besked: ' . $stmt->error;
     }
-    
 } catch (Exception $e) {
     $response['message'] = 'Fejl: ' . $e->getMessage();
 }

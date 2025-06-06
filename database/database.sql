@@ -124,6 +124,7 @@ CREATE TABLE news_reads (
 );
 
 -- Messages table
+-- Messages table (opdateret struktur)
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
@@ -135,6 +136,7 @@ CREATE TABLE messages (
     is_encrypted TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     read_at TIMESTAMP NULL DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_sender (sender_id, sender_type),
     INDEX idx_recipient (recipient_id, recipient_type),
     INDEX idx_created (created_at),
