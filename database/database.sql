@@ -124,7 +124,6 @@ CREATE TABLE news_reads (
 );
 
 -- Messages table
--- Messages table (opdateret struktur)
 CREATE TABLE messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sender_id INT NOT NULL,
