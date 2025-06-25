@@ -24,7 +24,7 @@ if (isset($conn)) {
 
     // Håndter paginering
     $page_number = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-    $items_per_page = 6;
+    $items_per_page = 12;
     $offset = ($page_number - 1) * $items_per_page;
 
     // Opbyg forespørgsel
@@ -81,14 +81,20 @@ if (isset($conn)) {
     }
 }
 
-// Hjælpefunktion til at generere profil billede URL
+// Hjælpefunktion til at generere profil billede URL - PHP 7.2 kompatibel
 function getProfileImageUrl($profileImage)
 {
     if ($profileImage && !empty($profileImage)) {
-        if (!str_starts_with($profileImage, 'http')) {
+        // Hvis det er en fuld URL, brug den direkte - PHP 7.2 kompatibel version
+        if (substr($profileImage, 0, 4) === 'http') {
+            return $profileImage;
+        }
+        // Hvis det er en relativ sti, tilføj base path
+        if (substr($profileImage, 0, 1) === '/') {
             return '/kollegieapp-webadmin' . $profileImage;
         }
-        return $profileImage;
+        // Hvis det er kun et filnavn, antag at det er i residents/images/
+        return '/kollegieapp-webadmin/residents/images/' . $profileImage;
     }
     return null;
 }
@@ -192,7 +198,15 @@ function getProfileImageUrl($profileImage)
                             $profileImageUrl = getProfileImageUrl($resident['profile_image']);
                             ?>
                             <!-- Resident Card -->
-                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> overflow-hidden resident-card cursor-pointer hover:shadow-lg transition-shadow" data-id="<?php echo $resident['id']; ?>" data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>" data-room="<?php echo htmlspecialchars($resident['room_number']); ?>" data-email="<?php echo htmlspecialchars($resident['email']); ?>" data-phone="<?php echo htmlspecialchars($resident['phone']); ?>" data-profile-image="<?php echo $profileImageUrl ? htmlspecialchars($profileImageUrl) : ''; ?>" onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+                            <div class="bg-white rounded-xl shadow animate-fade-in delay-<?php echo ($index % 4) * 100; ?> overflow-hidden resident-card cursor-pointer hover:shadow-lg transition-shadow"
+                                data-id="<?php echo $resident['id']; ?>"
+                                data-name="<?php echo htmlspecialchars($resident['first_name'] . ' ' . $resident['last_name']); ?>"
+                                data-room="<?php echo htmlspecialchars($resident['room_number']); ?>"
+                                data-email="<?php echo htmlspecialchars($resident['email']); ?>"
+                                data-phone="<?php echo htmlspecialchars($resident['phone']); ?>"
+                                data-profile-image="<?php echo $profileImageUrl ? htmlspecialchars($profileImageUrl) : ''; ?>"
+                                onclick="showResidentDetails(<?php echo $resident['id']; ?>)">
+
                                 <div class="flex justify-between items-center p-4 border-b border-gray-100">
                                     <div class="flex items-center gap-3">
                                         <?php if ($profileImageUrl): ?>
@@ -229,7 +243,7 @@ function getProfileImageUrl($profileImage)
                                         </div>
                                         <div>
                                             <p class="text-xs text-gray-500">Kontaktperson</p>
-                                            <p class="text-sm truncate"><?php echo htmlspecialchars($resident['contact_name'] ?: 'N/A'); ?></p>
+                                            <p class="text-sm truncate"><?php echo !empty($resident['contact_name']) ? htmlspecialchars($resident['contact_name']) : 'N/A'; ?></p>
                                         </div>
                                     </div>
                                     <div class="flex justify-end mt-2">
@@ -295,7 +309,7 @@ function getProfileImageUrl($profileImage)
                                         <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['room_number']); ?></td>
                                         <td class="px-4 py-3 text-sm truncate max-w-[200px]"><?php echo htmlspecialchars($resident['email']); ?></td>
                                         <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['phone']); ?></td>
-                                        <td class="px-4 py-3 text-sm"><?php echo htmlspecialchars($resident['contact_name'] ?: 'N/A'); ?></td>
+                                        <td class="px-4 py-3 text-sm"><?php echo !empty($resident['contact_name']) ? htmlspecialchars($resident['contact_name']) : 'N/A'; ?></td>
                                         <td class="px-4 py-3">
                                             <div class="flex justify-center gap-2">
                                                 <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="event.stopPropagation(); showResidentDetails(<?php echo $resident['id']; ?>)">
@@ -478,7 +492,7 @@ function getProfileImageUrl($profileImage)
             return !searchResults.classList.contains('hidden');
         }
 
-        // Søgefunktion
+        // Søgefunktion - Klon originale cards for at bevare samme layout
         function performSearch() {
             const query = liveSearch.value.trim().toLowerCase();
 
@@ -507,48 +521,68 @@ function getProfileImageUrl($profileImage)
             resultsGridView.innerHTML = '';
             resultsTableBody.innerHTML = '';
 
-            // Hent alle beboere
-            const allResidentCards = document.querySelectorAll('.resident-card');
-
-            // Hold styr på hvilke beboer-IDs der allerede er tilføjet
-            const addedResidentIds = new Set();
-
-            // Filtrer beboere
+            // Hent alle beboere cards og filtrer direkte
+            const allResidentCards = document.querySelectorAll('#residents-grid .resident-card, #residents-list .resident-card');
             let matchFound = false;
 
             allResidentCards.forEach(card => {
-                const cardId = card.getAttribute('data-id');
-
-                // Spring over hvis denne beboer allerede er tilføjet
-                if (addedResidentIds.has(cardId)) return;
-
                 const name = card.getAttribute('data-name').toLowerCase();
                 const room = card.getAttribute('data-room').toLowerCase();
                 const email = card.getAttribute('data-email').toLowerCase();
                 const phone = card.getAttribute('data-phone').toLowerCase();
-                const profileImage = card.getAttribute('data-profile-image') || '';
 
                 // Tjek om beboeren matcher søgningen
-                const matchesSearch = query === '' ||
-                    name.includes(query) ||
+                const matchesSearch = name.includes(query) ||
                     room.includes(query) ||
                     email.includes(query) ||
                     phone.includes(query);
 
                 if (matchesSearch) {
                     matchFound = true;
-                    // Tilføj ID til set'et for at undgå dubletter
-                    addedResidentIds.add(cardId);
 
-                    // Tilføj til grid visning
-                    const gridItem = createSearchResultGridItem(cardId, name, room, email, phone, profileImage);
-                    resultsGridView.appendChild(gridItem);
+                    // Klon den originale card til grid søgeresultater
+                    if (card.closest('#residents-grid')) {
+                        const clonedCard = card.cloneNode(true);
+                        resultsGridView.appendChild(clonedCard);
+                    }
 
-                    // Tilføj til liste visning
-                    const listItem = createSearchResultListItem(cardId, name, room, email, phone, profileImage);
-                    resultsTableBody.appendChild(listItem);
+                    // Klon den originale table row til list søgeresultater  
+                    if (card.closest('#residents-list')) {
+                        const clonedRow = card.cloneNode(true);
+                        resultsTableBody.appendChild(clonedRow);
+                    }
                 }
             });
+
+            // Hvis ingen match i grid, lav grid cards fra list data
+            if (matchFound && resultsGridView.children.length === 0) {
+                const listMatches = resultsTableBody.children;
+                for (let row of listMatches) {
+                    const id = row.getAttribute('data-id');
+
+                    // Find den originale grid card og klon den
+                    const originalGridCard = document.querySelector(`#residents-grid .resident-card[data-id="${id}"]`);
+                    if (originalGridCard) {
+                        const clonedCard = originalGridCard.cloneNode(true);
+                        resultsGridView.appendChild(clonedCard);
+                    }
+                }
+            }
+
+            // Hvis ingen match i list, lav list rows fra grid data
+            if (matchFound && resultsTableBody.children.length === 0) {
+                const gridMatches = resultsGridView.children;
+                for (let card of gridMatches) {
+                    const id = card.getAttribute('data-id');
+
+                    // Find den originale list row og klon den
+                    const originalListRow = document.querySelector(`#residents-list .resident-card[data-id="${id}"]`);
+                    if (originalListRow) {
+                        const clonedRow = originalListRow.cloneNode(true);
+                        resultsTableBody.appendChild(clonedRow);
+                    }
+                }
+            }
 
             // Vis "Ingen resultater" hvis ingen resultater blev fundet
             if (!matchFound) {
@@ -569,121 +603,6 @@ function getProfileImageUrl($profileImage)
             }
         }
 
-        // Opret grid element til søgeresultater
-        function createSearchResultGridItem(id, name, room, email, phone, profileImage) {
-            // Generer initialer
-            const nameParts = name.split(' ');
-            const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
-
-            // Vælg farve baseret på ID
-            const colors = ['primary', 'secondary', 'accent'];
-            const color = colors[id % colors.length];
-
-            // Opret element
-            const div = document.createElement('div');
-            div.className = 'bg-white rounded-xl shadow overflow-hidden resident-card cursor-pointer hover:shadow-lg transition-shadow';
-            div.setAttribute('data-id', id);
-            div.onclick = () => showResidentDetails(id);
-
-            // Profil billede HTML
-            const profileImageHtml = profileImage ?
-                `<div class="w-12 h-12 rounded-full bg-gray-200 overflow-hidden border-2 border-gray-100">
-                   <img src="${profileImage}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-lg font-medium" style="display: none;">
-                       ${initials}
-                   </div>
-               </div>` :
-                `<div class="w-12 h-12 rounded-full bg-${color} text-white flex items-center justify-center text-lg font-medium">
-                   ${initials}
-               </div>`;
-
-            div.innerHTML = `
-              <div class="flex justify-between items-center p-4 border-b border-gray-100">
-                  <div class="flex items-center gap-3">
-                      ${profileImageHtml}
-                      <div>
-                          <h3 class="font-bold text-gray-800">${name}</h3>
-                          <p class="text-sm text-gray-500">Værelse ${room}</p>
-                      </div>
-                  </div>
-              </div>
-              <div class="p-4">
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-                      <div>
-                          <p class="text-xs text-gray-500">Email</p>
-                          <p class="text-sm truncate">${email}</p>
-                      </div>
-                      <div>
-                          <p class="text-xs text-gray-500">Telefon</p>
-                          <p class="text-sm">${phone}</p>
-                      </div>
-                      <div>
-                          <p class="text-xs text-gray-500">Værelse</p>
-                          <p class="text-sm">${room}</p>
-                      </div>
-                  </div>
-                  <div class="flex justify-end mt-2">
-                      <button class="text-primary hover:text-primary/80 transition-colors text-sm font-medium" onclick="event.stopPropagation(); showResidentDetails(${id})">
-                          Se oplysninger
-                      </button>
-                  </div>
-              </div>
-          `;
-
-            return div;
-        }
-
-        // Opret liste element til søgeresultater
-        function createSearchResultListItem(id, name, room, email, phone, profileImage) {
-            // Generer initialer
-            const nameParts = name.split(' ');
-            const initials = (nameParts[0].charAt(0) + (nameParts[1] ? nameParts[1].charAt(0) : '')).toUpperCase();
-
-            // Vælg farve baseret på ID
-            const colors = ['primary', 'secondary', 'accent'];
-            const color = colors[id % colors.length];
-
-            // Opret element
-            const tr = document.createElement('tr');
-            tr.className = 'border-b hover:bg-gray-50 resident-card cursor-pointer';
-            tr.setAttribute('data-id', id);
-            tr.onclick = () => showResidentDetails(id);
-
-            // Profil billede HTML
-            const profileImageHtml = profileImage ?
-                `<div class="w-8 h-8 rounded-full bg-gray-200 overflow-hidden border border-gray-100">
-                   <img src="${profileImage}" alt="${name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-sm font-medium" style="display: none;">
-                       ${initials}
-                   </div>
-               </div>` :
-                `<div class="w-8 h-8 rounded-full bg-${color} text-white flex items-center justify-center text-sm font-medium">
-                   ${initials}
-               </div>`;
-
-            tr.innerHTML = `
-              <td class="px-4 py-3">
-                  <div class="flex items-center gap-2">
-                      ${profileImageHtml}
-                      <span class="font-medium">${name}</span>
-                  </div>
-              </td>
-              <td class="px-4 py-3 text-sm">${room}</td>
-              <td class="px-4 py-3 text-sm truncate max-w-[200px]">${email}</td>
-              <td class="px-4 py-3 text-sm">${phone}</td>
-              <td class="px-4 py-3 text-sm">N/A</td>
-              <td class="px-4 py-3">
-                  <div class="flex justify-center gap-2">
-                      <button class="text-gray-500 hover:text-primary transition-colors p-1" title="Se oplysninger" onclick="event.stopPropagation(); showResidentDetails(${id})">
-                          <i class="fas fa-eye"></i>
-                      </button>
-                  </div>
-              </td>
-          `;
-
-            return tr;
-        }
-
         // Tilføj event listeners til søgning
         liveSearch.addEventListener('input', performSearch);
 
@@ -697,10 +616,10 @@ function getProfileImageUrl($profileImage)
         function showResidentDetails(residentId) {
             // Vis loading indikator
             modalContent.innerHTML = `
-       <div class="flex justify-center">
-           <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-       </div>
-   `;
+                <div class="flex justify-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+                </div>
+            `;
 
             // Vis modal med animation
             modal.classList.remove('hidden');
@@ -731,97 +650,105 @@ function getProfileImageUrl($profileImage)
                         const colors = ['primary', 'secondary', 'accent'];
                         const color = colors[resident.id % colors.length];
 
-                        // Generer profil billede URL
-                        const profileImageUrl = resident.profile_image ?
-                            (resident.profile_image.startsWith('http') ? resident.profile_image : `/kollegieapp-webadmin${resident.profile_image}`) : null;
+                        // Generer profil billede URL - PHP 7.2 kompatibel version
+                        let profileImageUrl = null;
+                        if (resident.profile_image) {
+                            if (resident.profile_image.substr(0, 4) === 'http') {
+                                profileImageUrl = resident.profile_image;
+                            } else if (resident.profile_image.substr(0, 1) === '/') {
+                                profileImageUrl = `/kollegieapp-webadmin${resident.profile_image}`;
+                            } else {
+                                profileImageUrl = `/kollegieapp-webadmin/residents/images/${resident.profile_image}`;
+                            }
+                        }
 
-                        // Opdater modal indhold (uden send email og rediger knapper)
+                        // Opdater modal indhold
                         modalContent.innerHTML = `
-                   <div class="flex flex-col sm:flex-row gap-6">
-                       <div class="sm:w-1/3 flex flex-col items-center">
-                           ${profileImageUrl 
-                               ? `<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
-                                   <img src="${profileImageUrl}" alt="${resident.first_name} ${resident.last_name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                   <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-4xl font-medium" style="display: none;">
-                                       ${initials}
-                                   </div>
-                                 </div>`
-                               : `<div class="w-32 h-32 rounded-full bg-${color} text-white flex items-center justify-center text-4xl font-medium">
-                                   ${initials}
-                                 </div>`
-                           }
-                           <h3 class="text-xl font-bold mt-4 text-center">${resident.first_name} ${resident.last_name}</h3>
-                           <p class="text-gray-500 text-center">${resident.room_number}</p>
-                       </div>
-                       
-                       <div class="sm:w-2/3">
-                           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                               <div>
-                                   <h4 class="font-semibold text-gray-700 mb-4">Kontaktoplysninger</h4>
-                                   <div class="space-y-2">
-                                       <div>
-                                           <p class="text-xs text-gray-500">Email</p>
-                                           <p>${resident.email}</p>
-                                       </div>
-                                       <div>
-                                           <p class="text-xs text-gray-500">Telefon</p>
-                                           <p>${resident.phone}</p>
-                                       </div>
-                                       <div class="mt-4">
-                                           <p class="text-xs text-gray-500">Værelse</p>
-                                           <p>${resident.room_number}</p>
-                                       </div>
-                                   </div>
-                               </div>
-                               
-                               <div>
-                                   <h4 class="font-semibold text-gray-700 mb-4">Nødkontakt</h4>
-                                   <div class="space-y-2">
-                                       ${resident.contact_name ? `
-                                       <div>
-                                           <p class="text-xs text-gray-500">Navn</p>
-                                           <p>${resident.contact_name}</p>
-                                       </div>` : ''}
-                                       ${resident.contact_phone ? `
-                                       <div>
-                                           <p class="text-xs text-gray-500">Telefon</p>
-                                           <p>${resident.contact_phone}</p>
-                                       </div>` : ''}
-                                       ${!resident.contact_name && !resident.contact_phone ? `
-                                       <p class="text-gray-500">Ingen kontaktperson angivet</p>` : ''}
-                                   </div>
-                               </div>
-                           </div>
-                       </div>
-                   </div>
-               `;
+                            <div class="flex flex-col sm:flex-row gap-6">
+                                <div class="sm:w-1/3 flex flex-col items-center">
+                                    ${profileImageUrl 
+                                        ? `<div class="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-200">
+                                            <img src="${profileImageUrl}" alt="${resident.first_name} ${resident.last_name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                            <div class="w-full h-full bg-${color} text-white flex items-center justify-center text-4xl font-medium" style="display: none;">
+                                                ${initials}
+                                            </div>
+                                          </div>`
+                                        : `<div class="w-32 h-32 rounded-full bg-${color} text-white flex items-center justify-center text-4xl font-medium">
+                                            ${initials}
+                                          </div>`
+                                    }
+                                    <h3 class="text-xl font-bold mt-4 text-center">${resident.first_name} ${resident.last_name}</h3>
+                                    <p class="text-gray-500 text-center">Værelse ${resident.room_number}</p>
+                                </div>
+                                
+                                <div class="sm:w-2/3">
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                        <div>
+                                            <h4 class="font-semibold text-gray-700 mb-4">Kontaktoplysninger</h4>
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <p class="text-xs text-gray-500">Email</p>
+                                                    <p>${resident.email}</p>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs text-gray-500">Telefon</p>
+                                                    <p>${resident.phone}</p>
+                                                </div>
+                                                <div class="mt-4">
+                                                    <p class="text-xs text-gray-500">Værelse</p>
+                                                    <p>${resident.room_number}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div>
+                                            <h4 class="font-semibold text-gray-700 mb-4">Nødkontakt</h4>
+                                            <div class="space-y-2">
+                                                ${resident.contact_name ? `
+                                                <div>
+                                                    <p class="text-xs text-gray-500">Navn</p>
+                                                    <p>${resident.contact_name}</p>
+                                                </div>` : ''}
+                                                ${resident.contact_phone ? `
+                                                <div>
+                                                    <p class="text-xs text-gray-500">Telefon</p>
+                                                    <p>${resident.contact_phone}</p>
+                                                </div>` : ''}
+                                                ${!resident.contact_name && !resident.contact_phone ? `
+                                                <p class="text-gray-500">Ingen nødkontakt angivet</p>` : ''}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
                     } else {
                         // Vis fejlbesked
                         modalContent.innerHTML = `
-                   <div class="bg-red-50 rounded-lg p-4 text-center">
-                       <p class="text-red-500">Der opstod en fejl: ${data.message || 'Kunne ikke hente beboerdata'}</p>
-                   </div>
-                   <div class="flex justify-end mt-4">
-                       <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                           Luk
-                       </button>
-                   </div>
-               `;
+                            <div class="bg-red-50 rounded-lg p-4 text-center">
+                                <p class="text-red-500">Der opstod en fejl: ${data.message || 'Kunne ikke hente beboerdata'}</p>
+                            </div>
+                            <div class="flex justify-end mt-4">
+                                <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                                    Luk
+                                </button>
+                            </div>
+                        `;
                     }
                 })
                 .catch(error => {
                     console.error('Error fetching resident:', error);
                     modalContent.innerHTML = `
-               <div class="bg-red-50 rounded-lg p-4 text-center">
-                   <p class="text-red-500">Der opstod en fejl ved hentning af beboerdata: ${error.message}</p>
-                   <p class="text-sm text-red-400 mt-2">Kontroller, at filen get-resident-details.php eksisterer og fungerer korrekt.</p>
-               </div>
-               <div class="flex justify-end mt-4">
-                   <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
-                       Luk
-                   </button>
-               </div>
-           `;
+                        <div class="bg-red-50 rounded-lg p-4 text-center">
+                            <p class="text-red-500">Der opstod en fejl ved hentning af beboerdata: ${error.message}</p>
+                            <p class="text-sm text-red-400 mt-2">Kontroller, at filen get-resident-details.php eksisterer og fungerer korrekt.</p>
+                        </div>
+                        <div class="flex justify-end mt-4">
+                            <button class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg transition-colors" onclick="closeModal()">
+                                Luk
+                            </button>
+                        </div>
+                    `;
                 });
         }
 

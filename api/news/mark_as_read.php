@@ -23,16 +23,33 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Læs JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Tjek authorization
+// Tjek authorization med flere metoder
 $authorization = null;
+
+// Metode 1: Standard HTTP_AUTHORIZATION
 if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
     $authorization = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+}
+// Metode 2: Redirect variant
+elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
     $authorization = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
+}
+// Metode 3: Apache function
+elseif (function_exists('apache_request_headers')) {
     $headers = apache_request_headers();
     if (isset($headers['Authorization'])) {
         $authorization = $headers['Authorization'];
+    } elseif (isset($headers['authorization'])) {
+        $authorization = $headers['authorization'];
+    }
+}
+// Metode 4: getallheaders function
+elseif (function_exists('getallheaders')) {
+    $headers = getallheaders();
+    if (isset($headers['Authorization'])) {
+        $authorization = $headers['Authorization'];
+    } elseif (isset($headers['authorization'])) {
+        $authorization = $headers['authorization'];
     }
 }
 
@@ -43,6 +60,7 @@ if (!$authorization) {
     exit;
 }
 
+// Fjern "Bearer " prefix hvis det findes
 $auth = str_replace('Bearer ', '', $authorization);
 $authParts = explode(':', $auth);
 
@@ -89,14 +107,27 @@ try {
     $stmt->bind_param("i", $news_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
+
     if ($result->num_rows === 0) {
         $response['message'] = 'Nyhed ikke fundet';
         http_response_code(404);
         echo json_encode($response);
         exit;
     }
-    
+
+    // Tjek om brugeren eksisterer
+    $stmt = $conn->prepare("SELECT id FROM residents WHERE id = ?");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    if ($result->num_rows === 0) {
+        $response['message'] = 'Beboer ikke fundet';
+        http_response_code(404);
+        echo json_encode($response);
+        exit;
+    }
+
     // Indsæt eller opdater læsestatus (ON DUPLICATE KEY UPDATE for at undgå fejl hvis allerede læst)
     $stmt = $conn->prepare("
         INSERT INTO news_reads (news_id, resident_id, read_at)
@@ -104,19 +135,17 @@ try {
         ON DUPLICATE KEY UPDATE read_at = NOW()
     ");
     $stmt->bind_param("ii", $news_id, $user_id);
-    
+
     if ($stmt->execute()) {
         $response['success'] = true;
         $response['message'] = 'Nyhed markeret som læst';
     } else {
-        $response['message'] = 'Kunne ikke markere nyhed som læst: ' . $stmt->error;
+        $response['message'] = 'Kunne ikke markere nyhed som læst';
         http_response_code(500);
     }
-    
 } catch (Exception $e) {
-    $response['message'] = 'Fejl: ' . $e->getMessage();
+    $response['message'] = 'Serverfejl: ' . $e->getMessage();
     http_response_code(500);
 }
 
 echo json_encode($response);
-?>

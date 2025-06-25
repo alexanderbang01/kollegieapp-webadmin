@@ -14,6 +14,38 @@ if (!isset($_SESSION['user_id'])) {
 include '../components/header.php';
 include '../database/db_conn.php';
 
+// Funktion til at formatere dato på dansk
+function formatDanishDate($dateString)
+{
+    $date = new DateTime($dateString);
+
+    // Array med måneder på dansk
+    $danske_maaneder = [
+        'January' => 'januar',
+        'February' => 'februar',
+        'March' => 'marts',
+        'April' => 'april',
+        'May' => 'maj',
+        'June' => 'juni',
+        'July' => 'juli',
+        'August' => 'august',
+        'September' => 'september',
+        'October' => 'oktober',
+        'November' => 'november',
+        'December' => 'december'
+    ];
+
+    // Formater dato på engelsk først
+    $englishDate = $date->format('j. F Y · H:i');
+
+    // Erstat engelske måneder med danske
+    foreach ($danske_maaneder as $english => $danish) {
+        $englishDate = str_replace($english, $danish, $englishDate);
+    }
+
+    return $englishDate;
+}
+
 // Hent nyheder fra databasen
 $news = [];
 $featuredNews = null;
@@ -198,10 +230,7 @@ if (isset($conn)) {
                                             <span class="font-medium"><?php echo htmlspecialchars($featuredNews['author_name'] ?? 'Ukendt'); ?></span>
                                         </div>
                                         <div class="text-gray-500 text-sm">
-                                            <?php
-                                            $date = new DateTime($featuredNews['published_at']);
-                                            echo $date->format('j. F Y · H:i');
-                                            ?>
+                                            <?php echo formatDanishDate($featuredNews['published_at']); ?>
                                         </div>
                                     </div>
                                     <p class="text-gray-700 mb-4"><?php echo nl2br(htmlspecialchars($featuredNews['content'])); ?></p>
@@ -264,10 +293,7 @@ if (isset($conn)) {
                                                 <span class="font-medium"><?php echo htmlspecialchars($item['author_name'] ?? 'Ukendt'); ?></span>
                                             </div>
                                             <div class="text-gray-500 text-sm">
-                                                <?php
-                                                $date = new DateTime($item['published_at']);
-                                                echo $date->format('j. F Y · H:i');
-                                                ?>
+                                                <?php echo formatDanishDate($item['published_at']); ?>
                                             </div>
                                         </div>
                                         <p class="text-gray-700 mb-4 news-content">

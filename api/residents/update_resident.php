@@ -104,7 +104,7 @@ $first_name = trim($input['first_name']);
 $last_name = trim($input['last_name']);
 $email = trim(strtolower($input['email']));
 $phone = trim($input['phone']);
-$room_number = trim(strtoupper($input['room_number']));
+$room_number = trim($input['room_number']); // Fjernet strtoupper da det kun er tal nu
 $contact_name = isset($input['contact_name']) ? trim($input['contact_name']) : '';
 $contact_phone = isset($input['contact_phone']) ? trim($input['contact_phone']) : '';
 
@@ -116,16 +116,19 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-if (!preg_match('/^[a-zA-ZæøåÆØÅ\s]+$/u', $first_name) || 
-    !preg_match('/^[a-zA-ZæøåÆØÅ\s]+$/u', $last_name)) {
+if (
+    !preg_match('/^[a-zA-ZæøåÆØÅ\s]+$/u', $first_name) ||
+    !preg_match('/^[a-zA-ZæøåÆØÅ\s]+$/u', $last_name)
+) {
     $response['message'] = 'Navne må kun indeholde bogstaver';
     http_response_code(400);
     echo json_encode($response);
     exit;
 }
 
-if (!preg_match('/^[A-Z]-\d{3}$/', $room_number)) {
-    $response['message'] = 'Værelsenummer skal have format A-204';
+// RETTET: Ny validering for værelsenummer - kun 3 cifre
+if (!preg_match('/^\d{3}$/', $room_number)) {
+    $response['message'] = 'Værelsenummer skal være 3 cifre (f.eks. 204)';
     http_response_code(400);
     echo json_encode($response);
     exit;
@@ -134,22 +137,22 @@ if (!preg_match('/^[A-Z]-\d{3}$/', $room_number)) {
 require_once '../../database/db_conn.php';
 
 try {
-    // Tjek at email og værelse ikke er i brug af andre beboere
+    // Tjek kun at email ikke er i brug af andre beboere (værelse tjek fjernet)
     $check_stmt = $conn->prepare("
         SELECT id FROM residents 
-        WHERE (email = ? OR room_number = ?) AND id != ?
+        WHERE email = ? AND id != ?
     ");
-    $check_stmt->bind_param("ssi", $email, $room_number, $user_id);
+    $check_stmt->bind_param("si", $email, $user_id);
     $check_stmt->execute();
     $check_result = $check_stmt->get_result();
-    
+
     if ($check_result->num_rows > 0) {
-        $response['message'] = 'Email eller værelse er allerede i brug af en anden beboer';
+        $response['message'] = 'Email er allerede i brug af en anden beboer';
         http_response_code(409);
         echo json_encode($response);
         exit;
     }
-    
+
     // Opdater beboer
     $stmt = $conn->prepare("
         UPDATE residents SET 
@@ -163,18 +166,19 @@ try {
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
     ");
-    
-    $stmt->bind_param("sssssssi", 
-        $first_name, 
-        $last_name, 
-        $email, 
-        $phone, 
-        $room_number, 
-        $contact_name, 
-        $contact_phone, 
+
+    $stmt->bind_param(
+        "sssssssi",
+        $first_name,
+        $last_name,
+        $email,
+        $phone,
+        $room_number,
+        $contact_name,
+        $contact_phone,
         $user_id
     );
-    
+
     if ($stmt->execute()) {
         $response['success'] = true;
         $response['message'] = 'Profil opdateret succesfuldt';
@@ -192,11 +196,9 @@ try {
         $response['message'] = 'Kunne ikke opdatere profil';
         http_response_code(500);
     }
-    
 } catch (Exception $e) {
     $response['message'] = 'Serverfejl: ' . $e->getMessage();
     http_response_code(500);
 }
 
 echo json_encode($response);
-?>

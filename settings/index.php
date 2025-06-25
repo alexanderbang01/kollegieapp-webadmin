@@ -37,6 +37,30 @@ if (isset($conn)) {
         $current_user = $result->fetch_assoc();
     }
 }
+
+// Helper funktion til at tjekke om profilbillede eksisterer
+function getProfileImagePath($profile_image)
+{
+    if (empty($profile_image)) {
+        return false;
+    }
+
+    // Tjek forskellige mulige stier
+    $possible_paths = [
+        "../employees/images/" . $profile_image,
+        "../employees/images/" . basename($profile_image),
+        "employees/images/" . $profile_image,
+        "employees/images/" . basename($profile_image)
+    ];
+
+    foreach ($possible_paths as $path) {
+        if (file_exists($path)) {
+            return $path;
+        }
+    }
+
+    return false;
+}
 ?>
 
 <body class="font-poppins bg-gray-100 min-h-screen flex flex-col">
@@ -111,14 +135,24 @@ if (isset($conn)) {
                                     <div class="flex flex-col items-center mb-6">
                                         <div class="relative">
                                             <div id="current-profile-preview" class="w-24 h-24 rounded-full overflow-hidden border-4 border-gray-200 bg-gray-100 flex items-center justify-center">
-                                                <?php if (!empty($current_user['profile_image']) && file_exists("../employees/images/" . $current_user['profile_image'])): ?>
-                                                    <img src="../employees/images/<?php echo htmlspecialchars($current_user['profile_image']); ?>" alt="Profilbillede" class="w-full h-full object-cover">
+                                                <?php
+                                                $profile_image_path = getProfileImagePath($current_user['profile_image'] ?? '');
+                                                if ($profile_image_path): ?>
+                                                    <img src="<?php echo htmlspecialchars($profile_image_path); ?>" alt="Profilbillede" class="w-full h-full object-cover">
                                                 <?php else: ?>
                                                     <?php
-                                                    $name_parts = explode(' ', $current_user['name'] ?? '');
-                                                    $initials = strtoupper(substr($name_parts[0], 0, 1) . (isset($name_parts[1]) ? substr($name_parts[1], 0, 1) : ''));
+                                                    $name = $current_user['name'] ?? '';
+                                                    $name_parts = explode(' ', $name);
+                                                    $initials = '';
+                                                    if (count($name_parts) >= 2) {
+                                                        $initials = strtoupper(mb_substr($name_parts[0], 0, 1, 'UTF-8') . mb_substr($name_parts[1], 0, 1, 'UTF-8'));
+                                                    } elseif (count($name_parts) == 1) {
+                                                        $initials = strtoupper(mb_substr($name_parts[0], 0, 2, 'UTF-8'));
+                                                    } else {
+                                                        $initials = 'U';
+                                                    }
                                                     ?>
-                                                    <span class="text-2xl font-bold text-gray-500"><?php echo $initials; ?></span>
+                                                    <span class="text-2xl font-bold text-gray-500"><?php echo htmlspecialchars($initials); ?></span>
                                                 <?php endif; ?>
                                             </div>
                                             <label for="profile-image-input" class="absolute bottom-0 right-0 bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center cursor-pointer hover:bg-primary/90 transition-colors">
@@ -136,32 +170,32 @@ if (isset($conn)) {
 
                                     <div>
                                         <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Fulde navn</label>
-                                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($current_user['name'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="text" id="name" name="name" value="<?php echo htmlspecialchars($current_user['name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Brugernavn</label>
-                                        <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($current_user['username'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="text" id="username" name="username" value="<?php echo htmlspecialchars($current_user['username'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($current_user['email'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="email" id="email" name="email" value="<?php echo htmlspecialchars($current_user['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Telefonnummer</label>
-                                        <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($current_user['phone'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($current_user['phone'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label for="profession" class="block text-sm font-medium text-gray-700 mb-1">Profession</label>
-                                        <input type="text" id="profession" name="profession" value="<?php echo htmlspecialchars($current_user['profession'] ?? ''); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                        <input type="text" id="profession" name="profession" value="<?php echo htmlspecialchars($current_user['profession'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
                                     </div>
 
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Rolle</label>
-                                        <input type="text" value="<?php echo ucfirst($current_user['role'] ?? ''); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
+                                        <input type="text" value="<?php echo htmlspecialchars(ucfirst($current_user['role'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" class="w-full bg-gray-100 border border-gray-300 rounded-lg px-3 py-2" readonly>
                                     </div>
 
                                     <div class="pt-2">
@@ -318,43 +352,57 @@ if (isset($conn)) {
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <div class="flex items-center">
                                                             <div class="flex-shrink-0 h-10 w-10">
-                                                                <?php if (!empty($user['profile_image']) && file_exists("../employees/images/" . $user['profile_image'])): ?>
-                                                                    <img class="h-10 w-10 rounded-full object-cover" src="../employees/images/<?php echo htmlspecialchars($user['profile_image']); ?>" alt="<?php echo htmlspecialchars($user['name']); ?>">
+                                                                <?php
+                                                                $user_profile_image_path = getProfileImagePath($user['profile_image']);
+                                                                if ($user_profile_image_path): ?>
+                                                                    <img class="h-10 w-10 rounded-full object-cover" src="<?php echo htmlspecialchars($user_profile_image_path); ?>" alt="<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>">
                                                                 <?php else: ?>
                                                                     <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                                                        <?php echo strtoupper(substr($user['name'], 0, 2)); ?>
+                                                                        <?php
+                                                                        $name = $user['name'] ?? '';
+                                                                        $name_parts = explode(' ', $name);
+                                                                        $initials = '';
+                                                                        if (count($name_parts) >= 2) {
+                                                                            $initials = strtoupper(mb_substr($name_parts[0], 0, 1, 'UTF-8') . mb_substr($name_parts[1], 0, 1, 'UTF-8'));
+                                                                        } elseif (count($name_parts) == 1) {
+                                                                            $initials = strtoupper(mb_substr($name_parts[0], 0, 2, 'UTF-8'));
+                                                                        } else {
+                                                                            $initials = 'U';
+                                                                        }
+                                                                        echo htmlspecialchars($initials, ENT_QUOTES, 'UTF-8');
+                                                                        ?>
                                                                     </div>
                                                                 <?php endif; ?>
                                                             </div>
                                                             <div class="ml-4">
                                                                 <div class="text-sm font-medium text-gray-900">
-                                                                    <?php echo htmlspecialchars($user['name']); ?>
+                                                                    <?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>
                                                                 </div>
                                                                 <div class="text-sm text-gray-500">
-                                                                    <?php echo htmlspecialchars($user['username']); ?>
+                                                                    <?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?>
                                                                 </div>
                                                                 <?php if (!empty($user['profession'])): ?>
                                                                     <div class="text-xs text-gray-400">
-                                                                        <?php echo htmlspecialchars($user['profession']); ?>
+                                                                        <?php echo htmlspecialchars($user['profession'], ENT_QUOTES, 'UTF-8'); ?>
                                                                     </div>
                                                                 <?php endif; ?>
                                                             </div>
                                                         </div>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <div><?php echo htmlspecialchars($user['email'] ?? 'Ingen email'); ?></div>
+                                                        <div><?php echo htmlspecialchars($user['email'] ?? 'Ingen email', ENT_QUOTES, 'UTF-8'); ?></div>
                                                         <?php if (!empty($user['phone'])): ?>
-                                                            <div class="text-xs text-gray-400"><?php echo htmlspecialchars($user['phone']); ?></div>
+                                                            <div class="text-xs text-gray-400"><?php echo htmlspecialchars($user['phone'], ENT_QUOTES, 'UTF-8'); ?></div>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap">
                                                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full <?php echo $user['role'] === 'Administrator' ? 'bg-primary/10 text-primary' : 'bg-green-100 text-green-800'; ?>">
-                                                            <?php echo htmlspecialchars($user['role']); ?>
+                                                            <?php echo htmlspecialchars($user['role'], ENT_QUOTES, 'UTF-8'); ?>
                                                         </span>
                                                     </td>
                                                     <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                                         <?php if ($user['id'] !== $_SESSION['user_id']): ?>
-                                                            <button onclick="confirmDeleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name']); ?>')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600">
+                                                            <button onclick="confirmDeleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>')" class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-red-100 text-gray-600 hover:text-red-600">
                                                                 <i class="fas fa-trash"></i>
                                                             </button>
                                                         <?php endif; ?>

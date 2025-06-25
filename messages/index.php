@@ -1,13 +1,13 @@
 <?php
 $page = "messages";
 
-include '../components/header.php';
-include '../database/db_conn.php';
-
 // Start session
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
+include '../components/header.php';
+include '../database/db_conn.php';
 
 // Tjek om bruger er logget ind, ellers redirect til login
 if (!isset($_SESSION['user_id'])) {

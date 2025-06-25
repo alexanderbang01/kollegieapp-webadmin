@@ -1,11 +1,12 @@
 <?php
 $page = "login";
-include '../components/header.php';
 
 // Start session hvis den ikke allerede er startet
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
+
+include '../components/header.php';
 
 // Redirect to dashboard if already logged in
 if (isset($_SESSION['user_id'])) {

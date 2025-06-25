@@ -10,7 +10,46 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Generer initialer fra brugerens navn
+// Hent profilbillede fra session (sat ved login)
+$userProfileImage = isset($_SESSION['profile_image']) ? $_SESSION['profile_image'] : null;
+
+// Fallback: Hvis profilbillede ikke er i session, hent det fra database
+if ($userProfileImage === null && isset($_SESSION['user_id'])) {
+    // Find den korrekte sti til database ved at gå op i mappehierarkiet
+    $current_dir = __DIR__;
+    $db_found = false;
+
+    // Prøv op til 5 niveauer op for at finde database mappen
+    for ($i = 0; $i < 5; $i++) {
+        $db_path = $current_dir . '/database/db_conn.php';
+        if (file_exists($db_path)) {
+            require_once $db_path;
+            $db_found = true;
+            break;
+        }
+        $current_dir = dirname($current_dir);
+    }
+
+    // Hvis database forbindelse findes, hent profilbillede
+    if ($db_found && isset($conn)) {
+        try {
+            $stmt = $conn->prepare("SELECT profile_image FROM users WHERE id = ?");
+            $stmt->bind_param("i", $_SESSION['user_id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                $user_data = $result->fetch_assoc();
+                $userProfileImage = $user_data['profile_image'];
+                // Gem også i session for næste gang
+                $_SESSION['profile_image'] = $userProfileImage;
+            }
+        } catch (Exception $e) {
+            // Silent fejl
+        }
+    }
+}
+
+// Generer initialer fra brugerens navn (med støtte for danske bogstaver)
 $userInitials = "";
 if (isset($_SESSION['name'])) {
     $nameParts = explode(' ', $_SESSION['name']);
@@ -19,10 +58,10 @@ if (isset($_SESSION['name'])) {
         // Tag første bogstav af første navn og første bogstav af sidste navn
         $firstName = $nameParts[0];
         $lastName = $nameParts[count($nameParts) - 1];
-        $userInitials = strtoupper(substr($firstName, 0, 1) . substr($lastName, 0, 1));
+        $userInitials = mb_strtoupper(mb_substr($firstName, 0, 1, 'UTF-8') . mb_substr($lastName, 0, 1, 'UTF-8'), 'UTF-8');
     } elseif (count($nameParts) == 1) {
         // Hvis kun ét navn, tag de to første bogstaver
-        $userInitials = strtoupper(substr($nameParts[0], 0, 2));
+        $userInitials = mb_strtoupper(mb_substr($nameParts[0], 0, 2, 'UTF-8'), 'UTF-8');
     }
 }
 
@@ -50,8 +89,14 @@ if (isset($_SESSION['name'])) {
     <div class="py-4">
         <div class="px-6 py-3 mb-4">
             <div class="flex items-center gap-3 mb-1">
-                <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
-                    <span class="font-medium"><?php echo $userInitials; ?></span>
+                <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <?php if (!empty($userProfileImage)): ?>
+                        <img src="<?php echo htmlspecialchars($userProfileImage); ?>"
+                            alt="Profilbillede"
+                            class="w-full h-full object-cover">
+                    <?php else: ?>
+                        <span class="font-medium"><?php echo $userInitials; ?></span>
+                    <?php endif; ?>
                 </div>
                 <div class="min-w-0">
                     <p class="font-medium truncate whitespace-nowrap"><?php echo $displayName; ?></p>
@@ -82,12 +127,6 @@ if (isset($_SESSION['name'])) {
                 <a href="<?= $base ?>news/" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'news' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                     <i class="fas fa-newspaper"></i>
                     <span>Nyheder</span>
-                </a>
-            </li>
-            <li>
-                <a href="<?= $base ?>messages/" class="flex items-center gap-3 px-6 py-3 <?php echo $page === 'messages' ? 'bg-primary/10 text-primary font-medium border-r-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
-                    <i class="fas fa-comments"></i>
-                    <span>Beskeder</span>
                 </a>
             </li>
             <li>
@@ -133,8 +172,14 @@ if (isset($_SESSION['name'])) {
         <div class="py-4">
             <div class="px-4 py-3 mb-4">
                 <div class="flex items-center gap-3 mb-1">
-                    <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0">
-                        <span class="font-medium"><?php echo $userInitials; ?></span>
+                    <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        <?php if (!empty($userProfileImage)): ?>
+                            <img src="<?php echo htmlspecialchars($userProfileImage); ?>"
+                                alt="Profilbillede"
+                                class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <span class="font-medium"><?php echo $userInitials; ?></span>
+                        <?php endif; ?>
                     </div>
                     <div class="min-w-0"> <!-- Sikrer at indholdet ikke breder sig ud over containeren -->
                         <p class="font-medium truncate whitespace-nowrap"><?php echo $displayName; ?></p>
@@ -165,12 +210,6 @@ if (isset($_SESSION['name'])) {
                     <a href="<?= $base ?>news/" class="flex items-center gap-3 px-4 py-3 <?php echo $page === 'news' ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
                         <i class="fas fa-newspaper"></i>
                         <span>Nyheder</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="<?= $base ?>messages/" class="flex items-center gap-3 px-4 py-3 <?php echo $page === 'messages' ? 'bg-primary/10 text-primary font-medium border-l-4 border-primary' : 'text-gray-700 hover:bg-gray-100 transition-colors'; ?>">
-                        <i class="fas fa-comments"></i>
-                        <span>Beskeder</span>
                     </a>
                 </li>
                 <li>

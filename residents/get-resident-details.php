@@ -1,48 +1,57 @@
 <?php
 // Start session
-session_start();
-
-// Tjek om bruger er logget ind, ellers send fejl
-if (!isset($_SESSION['user_id'])) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Du er ikke logget ind']);
-    exit();
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
 }
 
-// Database forbindelse
-include '../database/db_conn.php';
+// Sæt header til JSON
+header('Content-Type: application/json');
 
-// Tjek om resident_id er angivet
+// Standard respons
+$response = [
+    'success' => false,
+    'message' => 'Der opstod en fejl',
+    'resident' => null
+];
+
+// Tjek om bruger er logget ind
+if (!isset($_SESSION['user_id'])) {
+    $response['message'] = 'Du skal være logget ind';
+    echo json_encode($response);
+    exit;
+}
+
+// Tjek om ID er angivet
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Ugyldigt beboer-ID']);
-    exit();
+    $response['message'] = 'Manglende eller ugyldigt ID';
+    echo json_encode($response);
+    exit;
 }
 
 $resident_id = (int)$_GET['id'];
 
-// Hent beboer fra databasen
-if (isset($conn)) {
+// Hent database forbindelse
+require_once '../database/db_conn.php';
+
+if ($conn) {
+    // Hent beboer data fra residents tabellen
     $stmt = $conn->prepare("SELECT * FROM residents WHERE id = ?");
     $stmt->bind_param("i", $resident_id);
     $stmt->execute();
     $result = $stmt->get_result();
-    
-    if ($result->num_rows === 1) {
+
+    if ($result && $result->num_rows > 0) {
         $resident = $result->fetch_assoc();
-        
-        // Send beboerdata som JSON
-        header('Content-Type: application/json');
-        echo json_encode(['success' => true, 'resident' => $resident]);
-        exit();
+
+        $response['success'] = true;
+        $response['message'] = 'Beboer hentet';
+        $response['resident'] = $resident;
     } else {
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Beboer blev ikke fundet']);
-        exit();
+        $response['message'] = 'Beboer ikke fundet';
     }
 } else {
-    header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Database forbindelse fejlede']);
-    exit();
+    $response['message'] = 'Databaseforbindelse fejlede';
 }
-?>
+
+echo json_encode($response);
+exit;
