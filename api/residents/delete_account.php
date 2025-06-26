@@ -20,16 +20,37 @@ if ($_SERVER['REQUEST_METHOD'] !== 'DELETE') {
     exit;
 }
 
-// Tjek authorization
-$headers = apache_request_headers();
-if (!isset($headers['Authorization'])) {
+// Tjek authorization med flere fallback metoder
+$authorization = null;
+
+if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+    $authorization = $_SERVER['HTTP_AUTHORIZATION'];
+} elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+    $authorization = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+} elseif (function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+    if (isset($headers['Authorization'])) {
+        $authorization = $headers['Authorization'];
+    } elseif (isset($headers['authorization'])) {
+        $authorization = $headers['authorization'];
+    }
+} elseif (function_exists('getallheaders')) {
+    $headers = getallheaders();
+    if (isset($headers['Authorization'])) {
+        $authorization = $headers['Authorization'];
+    } elseif (isset($headers['authorization'])) {
+        $authorization = $headers['authorization'];
+    }
+}
+
+if (!$authorization) {
     $response['message'] = 'Manglende authorization header';
     http_response_code(401);
     echo json_encode($response);
     exit;
 }
 
-$auth = str_replace('Bearer ', '', $headers['Authorization']);
+$auth = str_replace('Bearer ', '', $authorization);
 $authParts = explode(':', $auth);
 
 if (count($authParts) !== 2) {
@@ -40,12 +61,18 @@ if (count($authParts) !== 2) {
 }
 
 $user_id = (int)$authParts[0];
-$user_type = $authParts[1];
+$user_type = trim($authParts[1]);
 
-// Kun residents kan slette deres egen konto
 if ($user_type !== 'resident') {
     $response['message'] = 'Kun beboere kan slette deres egen konto';
     http_response_code(403);
+    echo json_encode($response);
+    exit;
+}
+
+if ($user_id <= 0) {
+    $response['message'] = 'Ugyldigt bruger ID';
+    http_response_code(400);
     echo json_encode($response);
     exit;
 }
@@ -57,7 +84,7 @@ try {
     $conn->autocommit(false);
 
     // Tjek om resident eksisterer
-    $stmt = $conn->prepare("SELECT id, name FROM residents WHERE id = ?");
+    $stmt = $conn->prepare("SELECT id, first_name, last_name FROM residents WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -70,68 +97,67 @@ try {
     }
 
     $user_data = $result->fetch_assoc();
-    $user_name = $user_data['name'];
+    $user_name = $user_data['first_name'] . ' ' . $user_data['last_name'];
 
     // Slet beboer-relaterede data
 
-    // Slet event tilmeldinger (event_participants tabel)
+    // Slet event_participants
     $stmt = $conn->prepare("DELETE FROM event_participants WHERE resident_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Slet læste nyheder
+    // Slet news_reads
     $stmt = $conn->prepare("DELETE FROM news_reads WHERE resident_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Slet notification reads
+    // Slet notification_reads
     $stmt = $conn->prepare("DELETE FROM notification_reads WHERE resident_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Slet beskeder hvor beboeren er afsender
+    // Slet udgående beskeder
     $stmt = $conn->prepare("DELETE FROM messages WHERE sender_id = ? AND sender_type = 'resident'");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Slet beskeder hvor beboeren er modtager
+    // Slet indgående beskeder
     $stmt = $conn->prepare("DELETE FROM messages WHERE recipient_id = ? AND recipient_type = 'resident'");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Slet aktiviteter relateret til denne resident
+    // Slet aktiviteter
     $stmt = $conn->prepare("DELETE FROM activities WHERE resident_id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
-    // Log kontosletningen som aktivitet (før sletning)
+    // Log kontosletningen
     $activity_description = "Beboeren $user_name slettede sin egen konto";
     $stmt = $conn->prepare("INSERT INTO activities (resident_id, activity_type, description) VALUES (?, 'account_deleted', ?)");
     $stmt->bind_param("is", $user_id, $activity_description);
     $stmt->execute();
 
-    // Slet selve beboeren
+    // Slet selve resident
     $stmt = $conn->prepare("DELETE FROM residents WHERE id = ?");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
 
     if ($stmt->affected_rows === 0) {
-        throw new Exception("Kunne ikke slette beboeren");
+        throw new Exception("Kunne ikke slette resident");
     }
 
-    // Commit transaktionen
+    // Commit transaktion
     $conn->commit();
 
     $response['success'] = true;
-    $response['message'] = 'Din konto er blevet slettet';
+    $response['message'] = 'Din konto er blevet slettet permanent';
 } catch (Exception $e) {
-    // Ved fejl: Rollback
+    // Rollback ved fejl
     if (isset($conn)) {
         $conn->rollback();
     }
 
-    error_log("Fejl i delete_account.php: " . $e->getMessage());
-    $response['message'] = 'Der opstod en fejl ved sletning af kontoen: ' . $e->getMessage();
+    $response['message'] = 'Der opstod en fejl ved sletning af kontoen';
     http_response_code(500);
 }
 

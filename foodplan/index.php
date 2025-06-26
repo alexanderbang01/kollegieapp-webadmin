@@ -256,10 +256,10 @@ if (isset($_SESSION['success_message'])) {
                         <?php endif; ?>
 
                         <?php if ($edit_mode): ?>
-                            <button id="placeholder-btn" class="bg-accent hover:bg-accent/90 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base transition-colors flex items-center gap-2">
+                            <!-- <button id="placeholder-btn" class="bg-accent hover:bg-accent/90 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-sm sm:text-base transition-colors flex items-center gap-2">
                                 <i class="fas fa-magic"></i>
                                 <span>Indsæt standardmadplan</span>
-                            </button>
+                            </button> -->
                         <?php endif; ?>
                     </div>
                 </div>

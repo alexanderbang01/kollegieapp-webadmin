@@ -110,9 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Ny validering for værelsenummer - kun 3 cifre
-    if (!preg_match('/^\d{3}$/', $roomNumber)) {
-        $response['message'] = 'Værelsenummer skal være 3 cifre (f.eks. 204)';
+    // Opdateret validering for værelsenummer - tillad 0-999
+    if (!preg_match('/^\d{1,3}$/', $roomNumber) || (int)$roomNumber < 0 || (int)$roomNumber > 999) {
+        $response['message'] = 'Værelsenummer skal være mellem 0 og 999';
         http_response_code(400);
         echo json_encode($response);
         exit;
